@@ -1,0 +1,6 @@
+apiVersion: v2
+name: populate-pull-secret
+description: Copies the cluster pull secret to a secret in a specific namespace
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

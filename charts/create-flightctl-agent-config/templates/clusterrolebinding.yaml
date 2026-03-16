@@ -1,0 +1,13 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: route-reader-binding
+subjects:
+  - kind: ServiceAccount
+    name: route-reader
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: route-reader
+  apiGroup: rbac.authorization.k8s.io

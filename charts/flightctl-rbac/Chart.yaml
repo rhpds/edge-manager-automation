@@ -1,0 +1,6 @@
+apiVersion: v2
+name: flightctl-rbac
+description: Creates a rolebinding so student users are admins in flightctl
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

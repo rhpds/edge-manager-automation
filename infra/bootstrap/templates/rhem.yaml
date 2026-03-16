@@ -1,0 +1,51 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rhem
+  namespace: openshift-gitops
+  labels:
+    application: rhem
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+  destination:
+    name: ''
+    namespace: rhem
+    server: 'https://kubernetes.default.svc'
+  ignoreDifferences:
+    - group: batch
+      jsonPointers:
+        - /spec
+        - /metadata/annotations
+        - /metadata/labels
+      kind: Job
+      name: flightctl-db-migration-1-dryrun
+  project: default
+  source:
+    chart: flightctl
+    helm:
+      parameters:
+        - name: global.baseDomain
+          value: fctl.{{ .Values.openshiftClusterIngressDomain }}
+        - forceString: true
+          name: global.enableOpenShiftExtensions
+          value: 'true'
+        - forceString: true
+          name: global.enableMulticlusterExtensions
+          value: 'false'
+        - name: global.auth.openshift.authorizationUrl
+          value: 'https://oauth-openshift.{{ .Values.openshiftClusterIngressDomain }}/oauth/authorize'
+        - name: global.auth.openshift.tokenUrl
+          value: 'https://oauth-openshift.{{ .Values.openshiftClusterIngressDomain }}/oauth/token'
+        - name: global.auth.openshift.issuer
+          value: 'https://oauth-openshift.{{ .Values.openshiftClusterIngressDomain }}/oauth/authorize'
+        - name: global.generateCertificates
+          value: builtin
+    repoURL: quay.io/flightctl/charts
+    targetRevision: 1.0.0-rc2

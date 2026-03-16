@@ -1,0 +1,53 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rhem-on-rhel
+  annotations:
+    description: "Ports related to RHEM"
+spec:
+  selector:
+    kubevirt.io/domain: rhem-virtual-machine
+  ports:
+    - name: api
+      protocol: TCP
+      port: 3443
+      targetPort: 3443
+    - name: agent
+      protocol: TCP
+      port: 7443
+      targetPort: 7443
+    - name: webui
+      protocol: TCP
+      port: 443
+      targetPort: 443
+    - name: oidc-pam
+      protocol: TCP
+      port: 8444
+      targetPort: 8444
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rhem-on-rhel-ssh
+spec:
+  selector:
+    kubevirt.io/domain: rhem-virtual-machine
+  ports:
+    - protocol: TCP
+      port: 22
+      targetPort: 22
+      name: ssh
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: import-disk-image
+spec:
+  selector:
+    kubevirt.io/domain: rhem-virtual-machine
+  ports:
+    - protocol: TCP
+      port: 8888
+      targetPort: 8888
+      name: http

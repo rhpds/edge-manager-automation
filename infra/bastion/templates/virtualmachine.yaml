@@ -1,0 +1,83 @@
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  annotations:
+    vm.kubevirt.io/validations: "[\n  {\n    \"name\": \"minimal-required-memory\",\n    \"path\": \"jsonpath::.spec.domain.memory.guest\",\n    \"rule\": \"integer\",\n    \"message\": \"This VM requires more memory.\",\n    \"min\": 1610612736\n  }\n]\n"
+  labels:
+    app: 'bastion'
+    kubevirt.io/dynamic-credentials-support: 'true'
+    vm.kubevirt.io/template: 'rhel10-server-small'
+    vm.kubevirt.io/template.namespace: 'openshift'
+    vm.kubevirt.io/template.revision: '1'
+    vm.kubevirt.io/template.version: 'v0.34.1'
+  name: 'bastion'
+spec:
+  dataVolumeTemplates:
+    - apiVersion: 'cdi.kubevirt.io/v1beta1'
+      kind: 'DataVolume'
+      metadata:
+        name: 'bastion'
+      spec:
+        sourceRef:
+          kind: 'DataSource'
+          name: 'rhel10'
+          namespace: 'openshift-virtualization-os-images'
+        storage:
+          resources:
+            requests:
+              storage: '30Gi'
+  runStrategy: 'RerunOnFailure'
+  template:
+    metadata:
+      annotations:
+        vm.kubevirt.io/flavor: 'small'
+        vm.kubevirt.io/os: 'rhel10'
+        vm.kubevirt.io/workload: 'server'
+      labels:
+        kubevirt.io/domain: 'bastion'
+        kubevirt.io/size: 'small'
+    spec:
+      architecture: 'amd64'
+      domain:
+        cpu:
+          cores: 1
+          sockets: 2
+          threads: 1
+        devices:
+          blockMultiQueue: true
+          disks:
+            - disk:
+                bus: 'virtio'
+              name: 'rootdisk'
+              cache: writethrough
+            - disk:
+                bus: 'virtio'
+              name: 'cloudinitdisk'
+          interfaces:
+            - masquerade: {}
+              model: 'virtio'
+              name: 'default'
+          rng: {}
+        features:
+          acpi: {}
+          smm:
+            enabled: true
+        firmware:
+          bootloader:
+            efi: {}
+        machine:
+          type: 'pc-q35-rhel9.6.0'
+        memory:
+          guest: '4Gi'
+      networks:
+        - name: 'default'
+          pod: {}
+      terminationGracePeriodSeconds: 180
+      volumes:
+        - dataVolume:
+            name: 'bastion'
+          name: 'rootdisk'
+        - cloudInitNoCloud:
+            userData: "#cloud-config\nuser: admin\npassword: {{ .Values.bastion.password }}\nchpasswd: { expire: False }\nssh_pwauth: true"
+          name: 'cloudinitdisk'

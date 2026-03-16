@@ -1,0 +1,28 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.guid }}-{{ .Values.tenant }}-namespace
+  namespace: openshift-gitops
+  labels:
+    application: {{ .Values.guid }}-{{ .Values.tenant }}-namespace
+    guid.rhdp.io: {{ .Values.guid }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: rh1-2026
+    path: tenant/namespace/
+    helm:
+      values: |
+        gitBranch: rh1-2026
+        tenant: {{ .Values.tenant }}
+        guid: "{{ .Values.guid }}"

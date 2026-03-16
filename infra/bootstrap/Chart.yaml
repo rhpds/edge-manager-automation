@@ -1,0 +1,8 @@
+---
+apiVersion: v2
+name: infra-bootstrap
+description: >
+  This parent chart follows the app-of-apps pattern to deploy the various infra components via their own charts.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

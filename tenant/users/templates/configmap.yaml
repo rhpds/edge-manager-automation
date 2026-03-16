@@ -1,0 +1,104 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: htpasswd-job-ansible-inputs
+data:
+  playbook.yaml: |
+    ---
+    - name: Initial setup of the bastion host
+      hosts:
+        - localhost
+      gather_facts: false
+      tasks:
+        - name: Add users to htpasswd file
+          community.general.htpasswd:
+            path: /tmp/htpasswd
+            create: true
+            name: '{{- "{{" }} item {{ "}}" }}'
+            password: '{{ .Values.bastionSshPassword }}'
+          loop:
+            {{- $userCount := int .Values.user.count }}
+            {{- range $index := until $userCount }}
+            - {{ $.Values.guid }}-{{ $.Values.user.prefix }}{{ add $index 1 }}
+            {{- end }}
+        - name: Create secret
+          ansible.builtin.shell:
+            cmd: oc create secret generic {{ .Values.guid }}-htpasswd --from-file=htpasswd=/tmp/htpasswd --dry-run=client --namespace=openshift-config -o yaml | oc apply -f -
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oauth-job-ansible-inputs
+data:
+  playbook.yaml: |
+    ---
+    - name: Modify cluster OAuth for {{ .Values.guid }} tenants
+      hosts:
+        - localhost
+      gather_facts: false
+      connection: local
+      vars:
+        oauth_identity_name: {{ .Values.guid }}-htpasswd
+        oauth_state: present
+      tasks:
+        - name: Read current OAuth config
+          kubernetes.core.k8s_info:
+            api_version: config.openshift.io/v1
+            kind: OAuth
+            name: cluster
+          register: oauth
+        - name: Extract identityProviders list
+          ansible.builtin.set_fact:
+            identity_providers: "{{- "{{" }} oauth.resources[0].spec.identityProviders {{ "}}" }}"
+        - name: Check if provider already exists
+          ansible.builtin.set_fact:
+            provider_exists: >-
+              {{ "{{" }}
+                identity_providers
+                | selectattr('name', 'equalto', oauth_identity_name)
+                | list
+                | length > 0
+              {{ "}}" }}
+        - name: Add provider entry (if state=present and missing)
+          ansible.builtin.set_fact:
+            identity_providers: >-
+              {{ "{{" }}
+                identity_providers + [{
+                  'name': oauth_identity_name,
+                  'mappingMethod': 'claim',
+                  'type': 'HTPasswd',
+                  'htpasswd': {
+                    'fileData': {
+                      'name': oauth_identity_name
+                    }
+                  }
+                }]
+              {{ "}}" }}
+          when:
+            - oauth_state == "present"
+            - not provider_exists
+        - name: Remove provider entry (if state=absent and exists)
+          ansible.builtin.set_fact:
+            identity_providers: >-
+              {{ "{{" }}
+                identity_providers
+                | rejectattr('name', 'equalto', oauth_identity_name)
+                | list
+              {{ "}}" }}
+          when:
+            - oauth_state == "absent"
+            - provider_exists
+        - name: Apply updated OAuth config ONLY if changes occurred
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: config.openshift.io/v1
+              kind: OAuth
+              metadata:
+                name: cluster
+              spec:
+                identityProviders: "{{- "{{" }} identity_providers {{ "}}" }}"
+          when:
+            - (provider_exists and oauth_state == "absent") or
+              (not provider_exists and oauth_state == "present")

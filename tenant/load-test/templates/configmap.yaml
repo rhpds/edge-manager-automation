@@ -1,0 +1,323 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: load-test-{{ .Values.guid }}-ansible-inputs
+data:
+  inventory.yaml: |
+    ---
+    all:
+      hosts:
+        bastion:
+          ansible_user: admin
+          ansible_password: {{ .Values.bastionSshPassword }}
+          ansible_host: bastion-ssh.bastion.svc.cluster.local
+          ansible_become: true
+  playbook.yaml: |
+    ---
+    - name: Setup user on bastion host
+      hosts:
+        - all
+      gather_facts: false
+      pre_tasks:
+        - name: Wait for VM to be up
+          ansible.builtin.wait_for_connection:
+            timeout: 600
+      tasks:
+        - name: Check for existing cert bundle
+          ansible.builtin.shell:
+            cmd: rpm -qa
+          register: _installed_packages
+          changed_when: false
+        - name: Install Satellite cert bundle
+          ansible.builtin.dnf:
+            name: https://demosat-ha.infra.demo.redhat.com/pub/katello-ca-consumer-latest.noarch.rpm
+            sslverify: false
+            validate_certs: false
+            state: present
+            disable_gpg_check: true
+          when:
+            - "'katello-ca-consumer' not in _installed_packages.stdout"
+        - name: Check for existing registration
+          ansible.builtin.shell:
+            cmd: subscription-manager status
+          failed_when: false
+          changed_when: false
+          register: _registration_status
+        - name: Registration flow if needed
+          when:
+            - "'Registered' not in _registration_status.stdout"
+          block:
+            - name: Set uuid fact
+              ansible.builtin.set_fact:
+                _generated_uuid: "{{ "{{" }} lookup('pipe', 'uuidgen') {{ "}}" }}"
+            - name: Ensure facts override dir exists
+              ansible.builtin.file:
+                path: /etc/rhsm/facts
+                state: directory
+            - name: Push facts override
+              ansible.builtin.template:
+                src: override.facts.j2
+                dest: /etc/rhsm/facts/override.facts
+            - name: Register to satellite
+              community.general.redhat_subscription:
+                state: present
+                org_id: "{{ .Values.satelliteOrg }}"
+                activationkey: "{{ .Values.satelliteActivationKey }}"
+                server_hostname: "{{ .Values.satelliteUrl }}"
+                force_register: true
+        - name: Install Ansible engine
+          ansible.builtin.dnf:
+            name:
+              - ansible-core
+              - sshpass
+        - name: Create folder to hold files
+          ansible.builtin.file:
+            path: /home/admin/{{ .Values.guid }}-load-test
+            state: directory
+            owner: admin
+            group: admin
+        - name: Copy down inventory
+          ansible.builtin.copy:
+            src: inventory-to-deploy.yaml
+            dest: /home/admin/{{ .Values.guid }}-load-test/inventory.yaml
+        - name: Copy down playbook
+          ansible.builtin.copy:
+            src: playbook-to-deploy.yaml
+            dest: /home/admin/{{ .Values.guid }}-load-test/playbook.yaml
+        - name: Copy down ansible.cfg
+          ansible.builtin.copy:
+            src: ansible-cfg-to-deploy.cfg
+            dest: /home/admin/{{ .Values.guid }}-load-test/ansible.cfg
+        - name: Copy down run command
+          ansible.builtin.copy:
+            content: |
+              #!/bin/bash
+              ansible-galaxy collection install ansible.posix containers.podman
+              ansible-playbook playbook.yaml --inventory inventory.yaml --forks {{ .Values.user.count }} -vv
+            dest: /home/admin/{{ .Values.guid }}-load-test/run-load-test.sh
+            mode: '0755'
+  
+  inventory-to-deploy.yaml: |
+    ---
+    all:
+      children:
+        {{ .Values.guid }}:
+          hosts:
+            {{- $userCount := int .Values.user.count }}
+            {{- range $index := until $userCount }}
+            {{ $.Values.guid }}-{{ $.Values.user.prefix }}{{ add $index 1 }}:
+              ansible_host: rhem-on-rhel-ssh.wksp-{{ $.Values.guid }}-{{ $.Values.user.prefix }}{{ add $index 1 }}.svc.cluster.local
+              ansible_user: {{ $.Values.user.prefix }}{{ add $index 1 }}
+              oidc_pam_url: "https://rhem-on-rhel-oidc-pam-wksp-{{ $.Values.guid }}-{{ $.Values.user.prefix }}{{ add $index 1 }}.{{ $.Values.openshiftClusterIngressDomain }}/api/v1/auth"
+              webui_url: "https://rhem-on-rhel-webui-wksp-{{ $.Values.guid }}-{{ $.Values.user.prefix }}{{ add $index 1 }}.{{ $.Values.openshiftClusterIngressDomain }}"
+              webui_callback_url: "https://rhem-on-rhel-webui-wksp-{{ $.Values.guid }}-{{ $.Values.user.prefix }}{{ add $index 1 }}.{{ $.Values.openshiftClusterIngressDomain }}/callback"
+            {{- end }}
+          vars:
+            ansible_password: "{{ .Values.bastionSshPassword }}"
+            static_redirect_url: "http://localhost:8080/callback"
+
+  playbook-to-deploy.yaml: |
+    ---
+    - name: Run through the exercises
+      hosts:
+        - {{ .Values.guid }}
+      pre_tasks:
+        - name: Reset if requested
+          become: true
+          when:
+            - reset_test is defined
+            - reset_test
+          block:
+            - name: Remove drone image
+              containers.podman.podman_image:
+                name: localhost/drone-image:v1
+                state: absent
+            - name: Remove qcow2 output
+              ansible.builtin.file:
+                path: "/home/{{ "{{" }} ansible_user {{ "}}" }}/rh1-2026-rhem-lab/build/output"
+                state: absent
+            - name: Force reset podman
+              ansible.builtin.shell: podman system reset --force
+      tasks:
+        - name: Install flightctl
+          ansible.builtin.dnf:
+            name:
+              - flightctl-services
+          become: true
+        - name: Start/enable the services
+          ansible.builtin.systemd:
+            name: flightctl.target
+            state: started
+            enabled: true
+          become: true
+        - name: Read in flightctl's config
+          ansible.builtin.slurp:
+            src: /etc/flightctl/service-config.yaml
+          register: _flightctl_config
+        - name: Parse config and update variables
+          ansible.builtin.set_fact:
+            _flightctl_current_config: "{{ "{{" }} _flightctl_config['content'] | b64decode | from_yaml {{ "}}" }}"
+        - name: Apply changes to the configuration structure
+          ansible.builtin.set_fact:
+            _flightctl_modified_config: >-
+              {{ "{{" }}
+                _flightctl_current_config | combine({
+                  'global': _flightctl_current_config.global | combine({
+                    'auth': _flightctl_current_config.global.auth | combine({
+                      'oidc': _flightctl_current_config.global.auth.oidc | combine({
+                        'issuer': oidc_pam_url
+                      }, recursive=True),
+                      'pamOidcIssuer': _flightctl_current_config.global.auth.pamOidcIssuer | combine({
+                        'issuer': oidc_pam_url,
+                        'redirectUris': (
+                          _flightctl_current_config.global.auth.pamOidcIssuer.redirectUris | default(none) 
+                          or [static_redirect_url]
+                        ) | union([webui_callback_url])
+                      }, recursive=True)
+                    }, recursive=True)
+                  }, recursive=True)
+                }, recursive=True)
+              {{ "}}" }}
+        - name: Write the modified config back to the file
+          ansible.builtin.copy:
+            content: "{{ "{{" }} _flightctl_modified_config | to_nice_yaml(indent=2, sort_keys=False) {{ "}}" }}"
+            dest: "/etc/flightctl/service-config.yaml"
+            backup: yes
+          become: true
+          notify: restart_flightctl
+        - name: Edit the BASE_UI_URL
+          ansible.builtin.lineinfile:
+            path: /usr/share/flightctl/flightctl-ui/env.template
+            regexp: '^BASE_UI_URL='
+            line: 'BASE_UI_URL={{ "{{" }} webui_url {{ "}}" }}'
+          become: true
+          notify: restart_flightctl
+        - name: Edit/add the IS_RHEM line
+          ansible.builtin.lineinfile:
+            path: /usr/share/flightctl/flightctl-ui/env.template
+            regexp: '^IS_RHEM='
+            line: 'IS_RHEM=true'
+          become: true
+          notify: restart_flightctl
+        - name: Meta - flush handlers
+          ansible.builtin.meta: flush_handlers
+        - name: Create groups via podman exec | admin
+          containers.podman.podman_container_exec:
+            name: flightctl-pam-issuer
+            command: groupadd flightctl-admin
+          register: _admin_group_create
+          become: true
+          changed_when:
+            - _admin_group_create.rc | int == 0
+          failed_when:
+            - _admin_group_create.rc | int != 0
+            - "'already exists' not in _admin_group_create.stderr"
+        - name: Create groups via podman exec | operator
+          containers.podman.podman_container_exec:
+            name: flightctl-pam-issuer
+            command: groupadd flightctl-operator
+          register: _operator_group_create
+          become: true
+          changed_when:
+            - _operator_group_create.rc | int == 0
+          failed_when:
+            - _operator_group_create.rc | int != 0
+            - "'already exists' not in _operator_group_create.stderr"
+        - name: Create groups via podman exec | viewer
+          containers.podman.podman_container_exec:
+            name: flightctl-pam-issuer
+            command: groupadd flightctl-viewer
+          register: _viewer_group_create
+          become: true
+          changed_when:
+            - _viewer_group_create.rc | int == 0
+          failed_when:
+            - _viewer_group_create.rc | int != 0
+            - "'already exists' not in _viewer_group_create.stderr"
+        - name: Create user via podman exec
+          containers.podman.podman_container_exec:
+            name: flightctl-pam-issuer
+            command: adduser {{ "{{" }} ansible_user {{ "}}" }}
+          register: _user_create
+          become: true
+          changed_when:
+            - _user_create.rc | int == 0
+          failed_when:
+            - _user_create.rc | int != 0
+            - "'already exists' not in _user_create.stderr"
+        - name: Set user account password
+          containers.podman.podman_container_exec:
+            name: flightctl-pam-issuer
+            argv:
+              - sh
+              - -c
+              - 'echo "{{ "{{" }} ansible_user {{ "}}" }}:redhat123" | chpasswd'
+          become: true
+        - name: Make user admin
+          containers.podman.podman_container_exec:
+            name: flightctl-pam-issuer
+            command: "usermod -aG flightctl-admin {{ "{{" }} ansible_user {{ "}}" }}"
+          become: true
+        - name: Clone git repo
+          ansible.builtin.git:
+            repo: 'https://gitea.{{ .Values.openshiftClusterIngressDomain }}/{{ .Values.guid }}-{{ "{{" }} ansible_user {{ "}}" }}/rh1-2026-rhem-lab.git'
+            dest: /home/{{ "{{" }} ansible_user {{ "}}" }}/rh1-2026-rhem-lab
+        - name: Login to RHEM and get agent config
+          ansible.builtin.shell: |
+            flightctl login https://rhem-on-rhel-api-wksp-{{ .Values.guid }}-{{ "{{" }} ansible_user {{ "}}" }}.{{ .Values.openshiftClusterIngressDomain }} --username {{ "{{" }} ansible_user {{ "}}" }} --password redhat123 --insecure-skip-tls-verify
+            flightctl certificate request --signer=enrollment --expiration=365d --output=embedded > /home/{{ "{{" }} ansible_user {{ "}}" }}/rh1-2026-rhem-lab/build/config.yaml
+          args:
+            creates: "/home/{{ "{{" }} ansible_user {{ "}}" }}/rh1-2026-rhem-lab/build/config.yaml"
+        - name: Modify the agent config for faster checkin
+          ansible.builtin.lineinfile:
+            line: "{{ "{{" }} line {{ "}}" }}"
+            path: "/home/{{ "{{" }} ansible_user {{ "}}" }}/rh1-2026-rhem-lab/build/config.yaml"
+          loop:
+            - 'spec-fetch-interval: 0m10s'
+            - 'status-update-interval: 0m10s'
+          loop_control:
+            loop_var: line
+        - name: Build image
+          containers.podman.podman_image:
+            name: localhost/drone-image:v1
+            path: "/home/{{ "{{" }} ansible_user {{ "}}" }}/rh1-2026-rhem-lab/build"
+            build:
+              format: oci
+          become: true
+        - name: Make output directory
+          ansible.builtin.file:
+            path: "/home/{{ "{{" }} ansible_user {{ "}}" }}/rh1-2026-rhem-lab/build/output"
+            state: directory
+        - name: Build qcow2 image
+          containers.podman.podman_container:
+            name: create-qcow2
+            rm: true
+            interactive: true
+            detach: false
+            privileged: true
+            security_opt:
+              - label=type:unconfined_t
+            volumes:
+              - /var/lib/containers/storage:/var/lib/containers/storage
+              - "/home/{{ "{{" }} ansible_user {{ "}}" }}/rh1-2026-rhem-lab/build/output:/output"
+            image: registry.redhat.io/rhel9/bootc-image-builder:latest
+            command: --type qcow2 localhost/drone-image:v1
+          become: true
+      handlers:
+        - name: Restart Flightctl
+          ansible.builtin.systemd:
+            name: flightctl.target
+            state: restarted
+          become: true
+          listen:
+            - restart_flightctl
+  override.facts.j2: |
+    {
+      'dmi.system.uuid': '{{ "{{" }} _generated_uuid {{ "}}" }}',
+      'network.hostname-override': '{{ "{{" }} _generated_uuid {{ "}}" }}'
+    }
+  ansible-cfg-to-deploy.cfg: |
+    [defaults]
+    host_key_checking = False
+    callbacks_enabled = profile_tasks

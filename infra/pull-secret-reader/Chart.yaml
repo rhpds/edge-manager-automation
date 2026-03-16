@@ -1,0 +1,8 @@
+---
+apiVersion: v2
+name: pull-secret-reader
+description: >
+  Create the appropriate resources so the cluster's pull secret can be read by desired service accounts.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

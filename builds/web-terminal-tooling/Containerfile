@@ -1,0 +1,7 @@
+FROM registry.redhat.io/web-terminal/web-terminal-tooling-rhel9@sha256:56d0e658242cc58de43792b658cad00978bb26acca8f8c52f9a6efaae0319306
+
+USER 0
+
+RUN curl -L https://github.com/flightctl/flightctl/releases/latest/download/flightctl-linux-amd64 --output /usr/local/bin/flightctl
+
+RUN chmod +x /usr/local/bin/flightctl

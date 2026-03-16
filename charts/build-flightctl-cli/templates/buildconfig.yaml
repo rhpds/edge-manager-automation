@@ -1,0 +1,22 @@
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  name: flightctl-cli
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: 'flightctl-cli:latest'
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  source:
+    type: Git
+    git:
+      uri: '{{ .Values.gitSource.url }}'
+      ref: {{ ((.Values.gitSource).ref) | default "main" }}
+    contextDir: builds/flightctl-cli

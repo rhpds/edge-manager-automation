@@ -1,0 +1,24 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: enable-rhsm-in-builds-rbac
+  namespace: openshift-gitops
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    application: enable-rhsm-in-builds-rbac
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+    namespace: openshift-config-managed
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: {{ .Values.gitBranch | default "main" }}
+    path: infra/enable-rhsm-in-builds-rbac/
+    helm:

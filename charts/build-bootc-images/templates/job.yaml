@@ -1,0 +1,67 @@
+{{- range .Values.bootcImages }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pipelinerun-{{ .name }}
+spec:
+  template:
+    spec:
+      serviceAccountName: tekton-job-sa
+      restartPolicy: OnFailure
+      backoffLimit: 20
+      containers:
+        - name: launch-pipeline
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for Pipeline 'build-bootc-image' to be available..."
+              TIMEOUT=300  # seconds
+              INTERVAL=5
+              ELAPSED=0
+              while ! oc get pipeline build-bootc-image > /dev/null 2>&1; do
+                if [ $ELAPSED -ge $TIMEOUT ]; then
+                  echo "Timeout waiting for Pipeline 'build-bootc-image' to be available"
+                  exit 1
+                fi
+                echo "Pipeline not found yet. Waiting..."
+                sleep $INTERVAL
+                ELAPSED=$((ELAPSED + INTERVAL))
+              done
+              echo "Pipeline found. Creating PipelineRun..."
+              cat <<EOF | oc create -f -
+              apiVersion: tekton.dev/v1
+              kind: PipelineRun
+              metadata:
+                generateName: build-bootc-image-
+              spec:
+                params:
+                  - name: imageName
+                    value: {{ .name }}
+                  - name: imageVersion
+                    value: {{ .version }}
+                  - name: containerfilesDirectory
+                    value: {{ .containerfilesDirectory }}
+                  - name: gitRepo
+                    value: '{{ .gitRepo }}'
+                  - name: gitRef
+                    value: {{ .gitRef }}
+                  - name: containerfilePath
+                    value: {{ .containerfilePath }}
+                  - name: dataVolumeStorageClass
+                    value: {{ .dataVolumeStorageClass }}
+                  - name: dataVolumeSize
+                    value: {{ .dataVolumeSize }}
+                  - name: bootcImageBuilderConfigMap
+                    value: {{ .bootcImageBuilderConfigMap }}
+                pipelineRef:
+                  name: build-bootc-image
+                taskRunTemplate:
+                  serviceAccountName: pipeline
+                timeouts:
+                  pipeline: 1h0m0s
+              EOF
+              echo "PipelineRun created successfully!"
+{{- end }}

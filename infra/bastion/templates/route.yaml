@@ -1,0 +1,13 @@
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: cockpit
+spec:
+  to:
+    kind: Service
+    name: bastion-cockpit
+  port:
+    targetPort: cockpit
+  tls:
+    termination: passthrough

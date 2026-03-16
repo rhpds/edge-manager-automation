@@ -1,0 +1,6 @@
+apiVersion: v2
+name: create-flightctl-agent-config
+description: Create a configmap with the agent config for flightctl
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

@@ -1,0 +1,22 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rhem-cli-web-terminal
+  namespace: openshift-gitops
+  labels:
+    application: rhem-cli-web-terminal
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+    namespace: openshift-operators
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: {{ .Values.gitBranch | default "main" }}
+    path: infra/rhem-cli-web-terminal/
+    helm:

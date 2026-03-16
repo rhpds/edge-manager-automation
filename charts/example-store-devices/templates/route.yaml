@@ -1,0 +1,28 @@
+{{- range .Values.storeDevices }}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ .name }}-pos
+spec:
+  to:
+    kind: Service
+    name: {{ .name }}-pos-service
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ .name }}-new-pos
+spec:
+  to:
+    kind: Service
+    name: {{ .name }}-new-pos-service
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+{{- end }}

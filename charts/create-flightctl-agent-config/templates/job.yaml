@@ -1,0 +1,142 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-flightctl-agent-config
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: route-reader
+      containers:
+        - name: create-flightctl-agent-config
+          image: image-registry.openshift-image-registry.svc:5000/{{ .Release.Namespace }}/flightctl-cli:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cd /tmp
+              FLIGHTCTL_USERNAME=$(cat /tmp/openshift-auth/username)
+              FLIGHTCTL_PASSWORD=$(cat /tmp/openshift-auth/password)
+
+              # Wait for route to become available
+              until FLIGHTCTL_API_URL=$(oc get route flightctl-api-route -n open-cluster-management -o go-template='{{ "{{" }}.spec.host{{ "}}" }}') && [ -n "$FLIGHTCTL_API_URL" ]; do
+                echo "Route not found, retrying in 5 seconds..."
+                sleep 5
+              done
+
+              # Wait until login to flightctl works
+              until flightctl login "https://$FLIGHTCTL_API_URL" --username "$FLIGHTCTL_USERNAME" --password "$FLIGHTCTL_PASSWORD" --insecure-skip-tls-verify; do
+                echo "Login failed, retrying in 5 seconds..."
+                sleep 5
+              done
+
+              # Attempt to get certificate, and retry if unsuccessful
+              until flightctl certificate request --signer=enrollment --expiration=365d --output=embedded > config.yaml; do
+                echo "Certificate request failed, retrying in 5 seconds..."
+                sleep 5
+              done
+
+              # Add enrollment request and configs into a configMap that builds will use later
+              echo '---
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: flightctl-agent-config
+              data:
+                config.yaml: |
+                  spec-fetch-interval: 0m10s
+                  status-update-interval: 0m10s' > /tmp/configmap.yaml
+              cat config.yaml | sed 's/^/    /g' >> /tmp/configmap.yaml
+              oc apply -f configmap.yaml
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: dot-config
+              mountPath: /.config
+            - name: openshift-auth
+              readOnly: true
+              mountPath: /tmp/openshift-auth
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 100Mi
+        - name: dot-config
+          emptyDir:
+            sizeLimit: 100Mi
+        - name: openshift-auth
+          secret:
+            secretName: openshift-auth
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-example-fleet
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: route-reader
+      containers:
+        - name: create-flightctl-agent-config
+          image: image-registry.openshift-image-registry.svc.cluster.local:5000/{{ .Release.Namespace }}/flightctl-cli:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cd /tmp
+              FLIGHTCTL_USERNAME=$(cat /tmp/openshift-auth/username)
+              FLIGHTCTL_PASSWORD=$(cat /tmp/openshift-auth/password)
+              until FLIGHTCTL_API_URL=$(oc get route flightctl-api-route -n open-cluster-management -o go-template='{{ "{{" }}.spec.host{{ "}}" }}') && [ -n "$FLIGHTCTL_API_URL" ]; do
+                echo "Route not found, retrying in 5 seconds..."
+                sleep 5
+              done
+
+              until flightctl login "https://$FLIGHTCTL_API_URL" --username "$FLIGHTCTL_USERNAME" --password "$FLIGHTCTL_PASSWORD" --insecure-skip-tls-verify; do
+                echo "Login failed, retrying in 5 seconds..."
+                sleep 5
+              done
+
+              echo '---
+              apiVersion: v1alpha1
+              kind: Fleet
+              metadata:
+                name: point-of-sale-prod
+                labels: {}
+              spec:
+                selector:
+                  matchLabels:
+                    pos: prod
+                template:
+                  metadata:
+                    labels: {}
+                  spec:
+                    os:
+                      image: 'image-registry.openshift-image-registry.svc:5000/student-services/rhel9-bootc-edgemanager-pos-prod:1.0.0'
+                    config: []
+                    applications: []' > /tmp/fleet.yaml
+              flightctl apply -f fleet.yaml
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: dot-config
+              mountPath: /.config
+            - name: openshift-auth
+              readOnly: true
+              mountPath: /tmp/openshift-auth
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 100Mi
+        - name: dot-config
+          emptyDir:
+            sizeLimit: 100Mi
+        - name: openshift-auth
+          secret:
+            secretName: openshift-auth

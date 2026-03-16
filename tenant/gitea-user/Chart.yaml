@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: gitea-user
+description: > 
+  This chart configures gitea for the tenant.
+version: 1.0.0
+appVersion: "1.0.0"

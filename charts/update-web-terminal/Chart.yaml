@@ -1,0 +1,8 @@
+---
+apiVersion: v2
+name: update-web-terminal
+description: >
+  Updates the image used by the web console terminal to a custom one
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

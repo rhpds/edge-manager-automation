@@ -1,0 +1,13 @@
+---
+
+storeDevices:
+  - name: ca-paloalto-store-01
+  - name: ca-torrance-store-01
+  - name: nc-charlotte-store-01
+  - name: nc-raleigh-store-01
+
+virtualMachines:
+  storageSize: 30Gi
+  storageClass: ocs-external-storagecluster-ceph-rbd-immediate
+  sourcePvcName: rhel9-bootc-edgemanager-base-1.0.0
+  sourcePvcNamespace: student-services

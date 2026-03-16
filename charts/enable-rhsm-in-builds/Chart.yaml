@@ -1,0 +1,6 @@
+apiVersion: v2
+name: enable-rhsm-in-builds
+description: Creates the necessary secret(s) to pull content from the RHCDN during builds
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

@@ -1,0 +1,285 @@
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rhem-vm-ansible-job-inputs
+data:
+  inventory.yaml: |
+    ---
+    all:
+      hosts:
+        rhem-virtual-machine:
+          {{- with .Values.rhemVirtualMachine }}
+          ansible_user: {{ .username }}
+          ansible_password: {{ .password }}
+          {{- end }}
+          ansible_host: rhem-on-rhel-ssh.{{ .Release.Namespace }}.svc.cluster.local
+
+  playbook.yaml: |
+    ---
+    - name: Initial setup of the student virtual machine
+      hosts:
+        - all
+      gather_facts: false
+      become: true
+      pre_tasks:
+        - name: Wait for VM to be up
+          ansible.builtin.wait_for_connection:
+            timeout: 600
+      tasks:
+        - name: Set the system hostname
+          ansible.builtin.hostname:
+            name: rhem-on-rhel.wksp-{{ .Values.guid }}-{{ .Values.rhemVirtualMachine.username }}.svc.cluster.local
+            use: systemd
+        - name: Put line into /etc/hosts
+          ansible.builtin.lineinfile:
+            path: /etc/hosts
+            line: '127.0.0.1 rhem-on-rhel.wksp-{{ .Values.guid }}-{{ .Values.rhemVirtualMachine.username }}.svc.cluster.local rhem-on-rhel'
+        - name: Check for existing cert bundle
+          ansible.builtin.shell:
+            cmd: rpm -qa
+          register: _installed_packages
+          changed_when: false
+        - name: Install Satellite cert bundle
+          ansible.builtin.dnf:
+            name: https://demosat-ha.infra.demo.redhat.com/pub/katello-ca-consumer-latest.noarch.rpm
+            sslverify: false
+            validate_certs: false
+            state: present
+            disable_gpg_check: true
+          when:
+            - "'katello-ca-consumer' not in _installed_packages.stdout"
+        - name: Check for existing registration
+          ansible.builtin.shell:
+            cmd: subscription-manager status
+          failed_when: false
+          changed_when: false
+          register: _registration_status
+        - name: Registration flow if needed
+          when:
+            - "'Simple Content Access' not in _registration_status.stdout"
+          block:
+            - name: Set uuid fact
+              ansible.builtin.set_fact:
+                _generated_uuid: "{{ "{{" }} lookup('pipe', 'uuidgen') {{ "}}" }}"
+            - name: Ensure facts override dir exists
+              ansible.builtin.file:
+                path: /etc/rhsm/facts
+                state: directory
+            - name: Push facts override
+              ansible.builtin.template:
+                src: override.facts.j2
+                dest: /etc/rhsm/facts/override.facts
+            - name: Register to satellite
+              community.general.redhat_subscription:
+                state: present
+                org_id: "{{ .Values.satelliteOrg }}"
+                activationkey: "{{ .Values.satelliteActivationKey }}"
+                server_hostname: "{{ .Values.satelliteUrl }}"
+                force_register: true
+        - name: Install some base packages
+          ansible.builtin.dnf:
+            name:
+              - git
+              - container-tools
+              - vim
+              - systemd-container
+        - name: Install some more packages but ignore GPG keys
+          ansible.builtin.dnf:
+            name:
+              - flightctl-cli
+            disable_gpg_check: true
+        - name: Download oc client from mirror site
+          ansible.builtin.get_url:
+            url: https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz
+            dest: /tmp/oc.tar.gz
+        - name: Extract oc cli tool
+          ansible.builtin.unarchive:
+            src: /tmp/oc.tar.gz
+            dest: /usr/local/bin/
+            mode: '0755'
+            exclude:
+              - README.md
+            remote_src: true
+        - name: Grab pull secret
+          ansible.builtin.shell:
+            cmd: oc get secret pull-secret -n openshift-config -o json
+          register: _pull_secret_raw
+          changed_when: false
+          delegate_to: localhost
+          become: false
+        - name: Extract pull secret
+          ansible.builtin.set_fact:
+            _pull_secret: "{{ "{{" }} _pull_secret_raw.stdout | from_json | json_query('data.\".dockerconfigjson\"') | b64decode | from_json {{ "}}" }}"
+          delegate_to: localhost
+        - name: Ensure directory exists
+          ansible.builtin.file:
+            state: directory
+            {{- with .Values.rhemVirtualMachine }}
+            path: /home/{{ .username }}/.config/containers
+            owner: {{ .username }}
+            group: {{ .username }}
+            {{- end }}
+        - name: Populate user's pull secret
+          ansible.builtin.copy:
+            content: "{{ "{{" }} _pull_secret | to_nice_json {{ "}}" }}"
+            {{- with .Values.rhemVirtualMachine }}
+            dest: /home/{{ .username }}/.config/containers/auth.json
+            owner: {{ .username }}
+            group: {{ .username }}
+            mode: '0640'
+            {{- end }}
+        - name: Ensure directory exists | root
+          ansible.builtin.file:
+            state: directory
+            path: /root/.config/containers
+            owner: root
+            group: root
+        - name: Populate root's pull secret
+          ansible.builtin.copy:
+            content: "{{ "{{" }} _pull_secret | to_nice_json {{ "}}" }}"
+            dest: /root/.config/containers/auth.json
+            owner: root
+            group: root
+            mode: '0640'
+        - name: Deploy import-disk-image script
+          ansible.builtin.copy:
+            src: "{{ "{{" }} playbook_dir {{ "}}" }}/import-disk-image.sh"
+            dest: /usr/local/bin/import-disk-image
+            owner: root
+            group: root
+            mode: '0755'
+
+  import-disk-image.sh: |
+    #!/usr/bin/env bash
+
+    set -euo pipefail
+
+    DELETE_FLAG="false"
+
+    usage() {
+      cat <<EOF
+    Usage: import-disk-image [--delete=true/false] [--qcow2-path=/path/to/dir]
+
+    Options:
+      --delete=true/false  (bool)  If true, delete the existing DataVolume - this will trigger a re-import.
+      --qcow2-path=<path>   Directory containing the qcow2 file to be imported, which should be named 'disk.qcow2'.
+      -h                   Show this help.
+
+    Examples:
+      import-disk-image --qcow2-path=/home/user1/output
+      import-disk-image --delete=true --qcow2-path=/home/user1/output
+    EOF
+    }
+
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --delete=*)
+          val="${1#*=}"
+          if [[ "$val" =~ ^(true|false)$ ]]; then
+            DELETE_FLAG="$val"
+          else
+            echo "ERROR: --delete must be true or false"
+            exit 1
+          fi
+          shift
+          ;;
+        --qcow2-path=*)
+          QCOW_PATH="${1#*=}"
+          shift
+          ;;
+        -h|--help)
+          usage
+          exit 1
+          ;;
+        *)
+          echo "Unknown argument: $1"
+          usage
+          exit 1
+          ;;
+      esac
+    done
+
+    echo "Checking cluster login..."
+    if ! oc whoami >/dev/null 2>&1; then
+      echo "ERROR: You are not logged in to an OpenShift cluster."
+      echo "Ensure you are logged in before running this script."
+      echo "Copy the login command from the web console to login."
+      exit 1
+    else
+      echo "Logged in as $(oc whoami)..."
+    fi
+
+    if podman ps -a --format "{{ "{{" }}.Names{{ "}}" }}" | grep -q "^httpd-qcow2$"; then
+      echo "Existing container found, removing it..."
+      podman rm -f httpd-qcow2 > /dev/null
+    fi
+
+    if [[ -n "$QCOW_PATH" ]]; then
+      echo "Hosting qcow in path: $QCOW_PATH"
+
+      if [[ ! -d "$QCOW_PATH" ]]; then
+        echo "ERROR: qcow-path '$QCOW_PATH' is not a directory."
+        exit 1
+      fi
+
+      if podman ps -a --format "{{ "{{" }}.Names{{ "}}" }}" | grep -q "^httpd-qcow2$"; then
+        echo "Existing container found, removing it..."
+        podman rm -f httpd-qcow2 >/dev/null
+      fi
+
+      echo "Ensuring permissions are correct on the export directory..."
+      sudo chown -R {{ .Values.rhemVirtualMachine.username }}:{{ .Values.rhemVirtualMachine.username }} "$QCOW_PATH"
+      sudo chmod -R 0755 "$QCOW_PATH"
+      sudo semanage fcontext -a -t container_file_t "$QCOW_PATH(/.*)?"
+      sudo restorecon -Rv "$QCOW_PATH"
+
+      echo "Starting new container..."
+      podman run -d \
+        --name httpd-qcow2 \
+        -p 8888:8080 \
+        -v "$QCOW_PATH":/var/www/html:Z \
+        ubi9/httpd-24
+
+      echo "Container 'httpd-qcow2' running on port 8888"
+    fi
+
+    echo "Ensuring the correct namespace is used..."
+    oc project wksp-{{ .Values.guid }}-{{ .Values.rhemVirtualMachine.username }}
+
+    if [[ "$DELETE_FLAG" == "true" ]]; then
+      echo "Deleting existing DataVolume..."
+      oc delete DataVolume drone-virtual-machine --ignore-not-found=true
+      echo "Wait for deletion..."
+      sleep 10
+    fi
+
+    echo "Triggering DataVolume import..."
+    oc apply -f - <<EOF
+    ---
+    apiVersion: cdi.kubevirt.io/v1beta1
+    kind: DataVolume
+    metadata:
+      name: drone-virtual-machine
+      annotations:
+        "cdi.kubevirt.io/storage.bind.immediate.requested": "true"
+    spec:
+      pvc:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 30Gi
+        volumeMode: Block
+      source:
+        http:
+          url: http://import-disk-image.wksp-{{ .Values.guid }}-{{ .Values.rhemVirtualMachine.username }}.svc.cluster.local:8888/disk.qcow2
+    EOF
+
+    echo "Done."
+  override.facts.j2: |
+    {
+      'dmi.system.uuid': '{{ "{{" }} _generated_uuid {{ "}}" }}',
+      'network.hostname-override': '{{ "{{" }} _generated_uuid {{ "}}" }}'
+    }

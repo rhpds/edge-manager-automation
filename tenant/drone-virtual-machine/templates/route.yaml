@@ -1,0 +1,22 @@
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: drone-cam-app
+spec:
+  to:
+    kind: Service
+    name: drone-cam
+  port:
+    targetPort: drone-cam
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: drone-tracker-app
+spec:
+  to:
+    kind: Service
+    name: drone-tracker
+  port:
+    targetPort: drone-tracker

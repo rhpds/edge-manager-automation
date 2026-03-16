@@ -1,0 +1,27 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: patch-web-terminal-tooling-job
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: patch-web-terminal-tooling
+      containers:
+        - name: patcher
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Patching DevWorkspaceTemplate..."
+              oc patch devworkspacetemplate web-terminal-tooling \
+                --type='json' \
+                -p='[{"op": "replace", "path": "/spec/components/0/container/image", "value": "{{ .Values.webTerminalToolingImage }}"}]' && \
+              oc annotate devworkspacetemplate web-terminal-tooling \
+                web-terminal.redhat.com/unmanaged-state=true --overwrite
+              echo "Deleting existing DevWorkspaces..."
+              for i in $(oc get DevWorkspace -A | grep -v NAMESPACE | awk '{print $2}'); do oc delete DevWorkspace $i -n openshift-terminal; done
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Never

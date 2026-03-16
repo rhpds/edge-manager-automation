@@ -1,0 +1,21 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: enable-rhsm-in-builds
+  namespace: openshift-gitops
+  labels:
+    application: enable-rhsm-in-builds
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+    namespace: student-services
+  project: default
+  syncPolicy:
+    automated: {}
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: {{ .Values.gitBranch | default "main" }}
+    path: charts/enable-rhsm-in-builds/
+    helm:

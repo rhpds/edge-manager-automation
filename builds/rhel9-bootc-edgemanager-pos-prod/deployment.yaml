@@ -1,0 +1,19 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: point-of-sale-deployment
+spec:
+  selector:
+    matchLabels:
+      app: point-of-sale
+  template:
+    metadata:
+      labels:
+        app: point-of-sale
+    spec:
+      containers:
+      - name: point-of-sale
+        image: quay.io/rhpds/pos-v1-prod:1.0.0
+        ports:
+          - containerPort: 8080

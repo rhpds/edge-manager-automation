@@ -1,0 +1,11 @@
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: point-of-sale
+spec:
+  port:
+    targetPort: 8080
+  to:
+    kind: Service
+    name: point-of-sale-service

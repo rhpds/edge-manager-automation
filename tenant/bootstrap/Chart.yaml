@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: tenant-bootstrap
+description: > 
+  This chart creates an appset which handles the app-of-apps for tenant services.
+version: 1.0.0
+appVersion: "1.0.0"

@@ -1,0 +1,8 @@
+---
+apiVersion: v2
+name: bastion
+description: >
+  A helm chart to create a bastion host with external connectivity and allow for post-deployment configurations
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

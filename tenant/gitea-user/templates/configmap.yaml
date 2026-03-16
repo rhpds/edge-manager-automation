@@ -1,0 +1,68 @@
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-user-ansible-job-inputs
+data:
+  playbook.yaml: |
+    ---
+    - name: Configure Gitea for {{ .Values.guid }}-{{ .Values.tenant }}
+      hosts:
+        - localhost
+      gather_facts: false
+      connection: local
+      pre_tasks:
+        - name: Wait for Gitea API
+          ansible.builtin.uri:
+            url: "https://gitea.{{ .Values.openshiftClusterIngressDomain }}/api/v1/version"
+          register: _gitea_api_check
+          until:
+            - _gitea_api_check.status | int == 200
+          retries: 20
+          delay: 10
+      tasks:
+        - name: Create user in Gitea
+          ansible.builtin.uri:
+            url: "https://gitea.{{ .Values.openshiftClusterIngressDomain }}/api/v1/admin/users"
+            headers:
+              Content-Type: application/json
+            force_basic_auth: true
+            url_username: "{{ .Values.giteaAdminUsername }}"
+            url_password: "{{ .Values.giteaAdminPassword }}"
+            method: POST
+            body_format: json
+            body:
+              email: "{{ .Values.guid }}-{{ .Values.tenant }}@dontemail.me"
+              username: "{{ .Values.guid }}-{{ .Values.tenant }}"
+              password: "{{ .Values.bastionSshPassword }}"
+              must_change_password: false
+          register: _user_create
+          changed_when:
+            - _user_create.status | int == 201
+          failed_when:
+            - _user_create.status | int != 201
+            - _user_create.status | int != 422
+        - name: Mirror template registry
+          ansible.builtin.uri:
+            url: "https://gitea.{{ .Values.openshiftClusterIngressDomain }}/api/v1/repos/migrate"
+            headers:
+              Content-Type: application/json
+            force_basic_auth: true
+            url_username: "{{ .Values.giteaAdminUsername }}"
+            url_password: "{{ .Values.giteaAdminPassword }}"
+            method: POST
+            body_format: json
+            body:
+              clone_addr: 'https://github.com/kenosborn-rh/rh1-2026-rhem-lab.git'
+              repo_name: rh1-2026-rhem-lab
+              mirror: false
+              private: false
+              description: "use for RHEM lab"
+              repo_owner: "{{ .Values.guid }}-{{ .Values.tenant }}"
+          register: _repo_create
+          changed_when:
+            - _repo_create.status | int == 201
+          failed_when:
+            - _repo_create.status | int != 201
+            - _repo_create.status | int != 409

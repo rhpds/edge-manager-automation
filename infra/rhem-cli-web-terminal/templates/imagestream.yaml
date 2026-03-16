@@ -1,0 +1,8 @@
+---
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  name: rhem-cli-web-terminal
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    imageregistry.openshift.io/public-visibility: 'true'

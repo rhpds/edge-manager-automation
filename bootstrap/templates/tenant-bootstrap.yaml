@@ -1,0 +1,37 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tenant-bootstrap
+  namespace: openshift-gitops
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    application: tenant-bootstrap
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+  project: default
+  syncPolicy:
+    automated: {}
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: rh1-2026
+    path: tenant/bootstrap/
+    helm:
+      values: |
+        gitBranch: rh1-2026
+        user:
+          {{- with .Values.user }}
+          prefix: "{{ .prefix }}"
+          count: "{{ .count }}"
+          {{- end }}
+        guid: "{{ .Values.guid }}"
+        bastion_ssh_password: "{{ .Values.bastion_ssh_password }}"
+        satellite_activationkey: "{{ .Values.satellite_activationkey }}"
+        satellite_org: "{{ .Values.satellite_org }}"
+        satellite_url: "{{ .Values.satellite_url }}"
+        gitea_admin_username: "{{ .Values.gitea_admin_username }}"
+        gitea_admin_password: "{{ .Values.gitea_admin_password }}"
+        openshiftClusterIngressDomain: "{{ .Values.deployer.domain }}"

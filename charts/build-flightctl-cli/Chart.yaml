@@ -1,0 +1,6 @@
+apiVersion: v2
+name: build-flightctl-cli
+description: Builds a container with the OC and FLIGHTCTL CLI tools
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

@@ -1,0 +1,12 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: patch-web-terminal-tooling
+rules:
+  - apiGroups: ["workspace.devfile.io"]
+    resources: ["devworkspacetemplates"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["workspace.devfile.io"]
+    resources: ["devworkspaces"]
+    verbs: ["list", "get", "delete"]

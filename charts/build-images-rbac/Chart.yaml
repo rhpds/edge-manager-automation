@@ -1,0 +1,8 @@
+---
+apiVersion: v2
+name: build-images-rbac
+description: >
+  Creates a service account, role, and role binding that allows the service account to trigger image builds
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

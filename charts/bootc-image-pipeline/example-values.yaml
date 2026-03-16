@@ -1,0 +1,7 @@
+---
+
+bootcImageBuilderConfig:
+  username: example-username
+  password: example-password
+
+pullSecret: 'your-pull-secret-here'

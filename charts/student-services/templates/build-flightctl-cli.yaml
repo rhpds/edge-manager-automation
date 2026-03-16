@@ -1,0 +1,23 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: build-flightctl-cli
+  namespace: openshift-gitops
+  labels:
+    application: build-flightctl-cli
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+    namespace: student-services
+  project: default
+  syncPolicy:
+    automated: {}
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: {{ .Values.gitBranch | default "main" }}
+    path: charts/build-flightctl-cli/
+    helm:
+      valueFiles:
+        - values.yaml

@@ -1,0 +1,7 @@
+[Install]
+WantedBy=default.target
+[Unit]
+After=network-online.target
+[Kube]
+Yaml=point-of-sale.yaml
+PublishPort=30000:8080

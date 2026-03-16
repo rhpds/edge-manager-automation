@@ -1,0 +1,30 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: student-services
+  namespace: openshift-gitops
+  labels:
+    application: student-services
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+  project: default
+  syncPolicy:
+    automated: {}
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: main
+    path: charts/student-services/
+    helm:
+      values: |
+        numberStudents: {{ .Values.user.count }}
+        openshiftAuth:
+          username: admin
+          password: {{ .Values.admin_password }}
+        students:
+{{- $userCount := int .Values.user.count }}
+{{- range $index := until $userCount }}
+          - wksp-user{{ add $index 1}}
+{{- end }}     

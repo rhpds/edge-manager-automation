@@ -1,0 +1,4 @@
+---
+gitSource:
+  url: https://github.com/rhpds/edge-fleet-gitops.git
+  ref: main

@@ -1,0 +1,26 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: student-virtual-machines
+  namespace: openshift-gitops
+  labels:
+    application: student-virtual-machines
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+    namespace: student-services
+  project: default
+  syncPolicy:
+    automated: {}
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: {{ .Values.gitBranch | default "main" }}
+    path: charts/student-virtual-machines/
+    helm:
+      valueFiles:
+        - values.yaml
+      values: |
+        students:
+{{- toYaml .Values.students | nindent 10 }}

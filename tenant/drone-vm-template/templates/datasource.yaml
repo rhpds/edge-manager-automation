@@ -1,0 +1,13 @@
+---
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataSource
+metadata:
+  name: drone-virtual-machine
+  labels:
+    app.kubernetes.io/component: drone-virtual-machine-template
+    kubevirt.io/dynamic-credentials-support: "false"
+spec:
+  source:
+    pvc:
+      name: drone-virtual-machine
+      namespace: wksp-{{ .Values.guid }}-{{ .Values.tenant }}

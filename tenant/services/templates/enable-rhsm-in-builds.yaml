@@ -1,0 +1,29 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.guid }}-{{ .Values.tenant }}-enable-rhsm-in-builds
+  namespace: openshift-gitops
+  labels:
+    application: {{ .Values.guid }}-{{ .Values.tenant }}-enable-rhsm-in-builds
+    guid.rhdp.io: {{ .Values.guid }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+    namespace: wksp-{{ .Values.guid }}-{{ .Values.tenant }}
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: rh1-2026
+    path: tenant/enable-rhsm-in-builds/
+    helm:
+      values: |
+        gitBranch: rh1-2026
+        tenant: {{ .Values.tenant }}
+        guid: "{{ .Values.guid }}"

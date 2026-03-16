@@ -1,0 +1,26 @@
+FROM registry.redhat.io/rhel9/rhel-bootc:9.5
+
+# Install flightctl agent
+RUN dnf \
+    --enablerepo=rhacm-2.13-for-rhel-9-x86_64-rpms \
+    install -y \
+    flightctl-agent-0.5.1-2.el9fc && \
+    dnf -y clean all && \
+    rm -rf /var/cache/dnf/*
+
+# Add flightctl agent config
+ADD .flightctl-agent-config/config.yaml /etc/flightctl/
+
+# Add registry auth
+ADD .registry-auth/auth.json /usr/lib/container-auth.json
+RUN chmod 0600 /usr/lib/container-auth.json && \
+    ln -sr /usr/lib/container-auth.json /etc/ostree/auth.json
+
+# Ignore registry certs
+ADD ocp-internal-registry.conf /etc/containers/registries.conf.d/999-ocp-internal-registry.conf
+
+# Disable auto-updates
+RUN systemctl mask bootc-fetch-apply-updates.timer
+
+# Lint the build
+RUN bootc container lint

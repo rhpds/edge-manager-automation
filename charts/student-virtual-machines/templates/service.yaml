@@ -1,0 +1,30 @@
+{{- range .Values.students }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: point-of-sale-service
+  namespace: {{ . }}
+spec:
+  selector:
+    kubevirt.io/domain: {{ . }}-edge-device
+  ports:
+    - protocol: TCP
+      port: 30000
+      targetPort: 30000
+      name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: new-point-of-sale-service
+  namespace: {{ . }}
+spec:
+  selector:
+    kubevirt.io/domain: {{ . }}-edge-device
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+      name: http
+{{- end }}

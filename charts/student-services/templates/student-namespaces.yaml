@@ -1,0 +1,26 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: student-namespaces
+  namespace: openshift-gitops
+  labels:
+    application: student-namespaces
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+  project: default
+  syncPolicy:
+    automated: {}
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: main
+    path: charts/student-namespaces/
+    helm:
+      values: |
+        studentNamespaces:
+          - student-services
+{{- if .Values.studentNamespaces }}
+{{- toYaml .Values.studentNamespaces | nindent 10 }}
+{{- end }}

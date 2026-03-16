@@ -1,0 +1,12 @@
+---
+
+# The following would create 4 namespaces:
+# - student-services
+# - student1
+# - student2
+# - student3
+
+studentNamespaces:
+  - student1
+  - student2
+  - student3

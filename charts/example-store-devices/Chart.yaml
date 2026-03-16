@@ -1,0 +1,6 @@
+apiVersion: v2
+name: example-store-devices
+description: Create a set of example devices
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

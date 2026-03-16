@@ -1,0 +1,6 @@
+---
+
+# Provide OCP auth credentials which also work for flightctl
+openshiftAuth:
+  username: your-username-here
+  password: your-password-here

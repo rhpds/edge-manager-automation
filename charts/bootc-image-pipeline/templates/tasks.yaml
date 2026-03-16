@@ -1,0 +1,84 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: manage-k8s-object
+spec:
+  params:
+    - name: action
+      description: Action to take, such as apply/delete
+      type: string
+    - name: manifest
+      description: Yaml manifest
+      type: string
+  steps:
+    - name: run-oc-cli
+      image: registry.redhat.io/openshift4/ose-cli:latest
+      env:
+        - name: ACTION
+          value: $(params.action)
+        - name: MANIFEST
+          value: $(params.manifest)
+      script: |
+        echo "Processing manifest..."; \
+        echo -e "$MANIFEST" > /tmp/manifest.yaml; \
+        echo "Outputting inputs..."; \
+        echo "Action: $ACTION"; \
+        echo "Manifest:"; \
+        cat /tmp/manifest.yaml; \
+        echo "Executing..."; \
+        oc $ACTION -f /tmp/manifest.yaml
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-image
+spec:
+  params:
+    - name: buildconfig-name
+      description: The name of the BuildConfig to trigger
+      type: string
+  steps:
+    - name: start-build
+      image: registry.redhat.io/openshift4/ose-cli:latest
+      script: |
+        #!/bin/sh
+        oc start-build $(params.buildconfig-name) --wait
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: wait-for-job
+spec:
+  params:
+    - name: job-name
+      type: string
+    - name: job-timeout
+      type: string
+      default: '600'
+  steps:
+    - name: wait-for-job
+      image: registry.redhat.io/openshift4/ose-cli:latest
+      script: |
+        #!/bin/sh
+        echo "Waiting for Job $(params.job-name) to complete..."
+        oc wait --for=condition=complete --timeout=$(params.job-timeout)s job/$(params.job-name)
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: wait-for-datavolume
+spec:
+  params:
+    - name: datavolume-name
+      type: string
+    - name: datavolume-timeout
+      type: string
+      default: '600'
+  steps:
+    - name: wait-for-datavolume-import
+      image: registry.redhat.io/openshift4/ose-cli:latest
+      script: |
+        #!/bin/sh
+        echo "Waiting for DataVolume $(params.datavolume-name) to be ready..."
+        oc wait --for=condition=Ready --timeout=$(params.datavolume-timeout)s dv/$(params.datavolume-name)

@@ -1,0 +1,15 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bootc-image-builder-config
+data:
+  config.toml: |
+    [[customizations.user]]
+    name = "{{ .Values.bootcImageBuilderConfig.username }}"
+    password = "{{ .Values.bootcImageBuilderConfig.password }}"
+    groups = ["wheel"]
+    [customizations.kernel]
+    name = "disable-selinux"
+    append = "selinux=0"
+

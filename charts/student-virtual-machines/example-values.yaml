@@ -1,0 +1,12 @@
+---
+
+students:
+  - student1
+  - student2
+  - student3
+
+virtualMachines:
+  storageSize: 30Gi
+  storageClass: example-storage-class
+  sourcePvcName: source-pvc-here
+  sourcePvcNamespace: student-services

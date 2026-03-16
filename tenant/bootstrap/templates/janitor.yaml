@@ -1,0 +1,37 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.guid }}-janitor
+  namespace: openshift-gitops
+  labels:
+    application: {{ .Values.guid }}-janitor
+    guid.rhdp.io: {{ .Values.guid }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+    namespace: default
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: rh1-2026
+    path: tenant/janitor/
+    helm:
+      values: |
+        gitBranch: rh1-2026
+        user:
+          {{- with .Values.user }}
+          prefix: "{{ .prefix }}"
+          count: "{{ .count }}"
+          {{- end }}
+        guid: "{{ .Values.guid }}"
+        bastionSshPassword: "{{ .Values.bastion_ssh_password }}"
+        giteaAdminUsername: "{{ .Values.gitea_admin_username }}"
+        giteaAdminPassword: "{{ .Values.gitea_admin_password }}"
+        openshiftClusterIngressDomain: "{{ .Values.openshiftClusterIngressDomain }}"

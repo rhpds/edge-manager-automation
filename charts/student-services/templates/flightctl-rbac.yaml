@@ -1,0 +1,23 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: flightctl-rbac
+  namespace: openshift-gitops
+  labels:
+    application: flightctl-rbac
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+    namespace: open-cluster-management
+  project: default
+  syncPolicy:
+    automated: {}
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: {{ .Values.gitBranch | default "main" }}
+    path: charts/flightctl-rbac/
+    helm:
+      values: |
+        numberStudents: {{ .Values.numberStudents }}

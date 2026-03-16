@@ -1,0 +1,4 @@
+---
+
+advancedClusterManagement:
+  storageClassName: your-storage-class-here

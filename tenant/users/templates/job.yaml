@@ -1,0 +1,76 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.guid }}-create-htpasswd
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+  labels:
+    app.kubernetes.io/name: create-htpasswd-job
+    app.kubernetes.io/part-of: create-htpasswd
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: create-htpasswd-job
+        app.kubernetes.io/part-of: create-htpasswd
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: oauth-manager
+      containers:
+        - name: run-ansible-playbook
+          image: quay.io/jswanson/general-ansible-ee:rh1-2026
+          imagePullPolicy: Always
+          command: ["ansible-playbook", "/runner/playbook.yaml", "-vv"]
+          volumeMounts:
+            - name: playbook
+              mountPath: /runner/playbook.yaml
+              subPath: playbook.yaml
+            - name: scratch
+              mountPath: /.ansible
+      volumes:
+        - name: playbook
+          configMap:
+            name: htpasswd-job-ansible-inputs
+        - name: scratch
+          emptyDir: {}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.guid }}-edit-oauth
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+  labels:
+    app.kubernetes.io/name: edit-oauth-job
+    app.kubernetes.io/part-of: edit-oauth
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: edit-oauth-job
+        app.kubernetes.io/part-of: edit-oauth
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: oauth-manager
+      containers:
+        - name: run-ansible-playbook
+          image: quay.io/jswanson/general-ansible-ee:rh1-2026
+          imagePullPolicy: Always
+          command: ["ansible-playbook", "/runner/playbook.yaml", "-vv"]
+          volumeMounts:
+            - name: playbook
+              mountPath: /runner/playbook.yaml
+              subPath: playbook.yaml
+            - name: scratch
+              mountPath: /.ansible
+      volumes:
+        - name: playbook
+          configMap:
+            name: oauth-job-ansible-inputs
+        - name: scratch
+          emptyDir: {}

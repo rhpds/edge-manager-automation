@@ -1,0 +1,101 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: get-webconsole-image
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      serviceAccountName: patch-web-terminal-tooling
+      restartPolicy: OnFailure
+      containers:
+        - name: patcher
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Getting current web terminal image..."
+              IMAGE=$(oc get devworkspacetemplate web-terminal-tooling -n openshift-operators -o go-template='{{ "{{" }} (index .spec.components 0).container.image {{ "}}" }}')
+              if [ -z "$IMAGE" ]; then
+                echo "Image not found, failing..."
+                exit 1
+              fi
+              echo "Current image: $IMAGE"
+              echo "Create Containerfile for image build..."
+              echo "---
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: build-from-image
+              data:
+                BASE_IMAGE: $IMAGE" > /tmp/configmap.yaml
+              echo "Printing out configmap..."
+              cat /tmp/configmap.yaml
+              echo "Applying configmap..."
+              oc apply -f /tmp/configmap.yaml
+          imagePullPolicy: IfNotPresent
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: start-rhem-cli-web-terminal-build
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      serviceAccountName: patch-web-terminal-tooling
+      containers:
+        - name: build
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              oc start-build rhem-cli-web-terminal --build-arg BASE_IMAGE=$BASE_IMAGE --wait
+          env:
+            - name: BASE_IMAGE
+              valueFrom:
+                configMapKeyRef:
+                  name: build-from-image
+                  key: BASE_IMAGE
+      restartPolicy: OnFailure
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: patch-web-terminal-tooling
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: patch-web-terminal-tooling
+      containers:
+        - name: patcher
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Patching DevWorkspaceTemplate..."
+              oc patch devworkspacetemplate web-terminal-tooling \
+                --type='json' \
+                -p='[{"op": "replace", "path": "/spec/components/0/container/image", "value": "image-registry.openshift-image-registry.svc:5000/openshift-operators/rhem-cli-web-terminal"}]' && \
+              oc annotate devworkspacetemplate web-terminal-tooling \
+                web-terminal.redhat.com/unmanaged-state=true --overwrite
+              echo "Deleting existing DevWorkspaces..."
+              for i in $(oc get DevWorkspace -A | grep -v NAMESPACE | awk '{print $2}'); do oc delete DevWorkspace $i -n openshift-terminal; done
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Never

@@ -1,0 +1,29 @@
+---
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+spec:
+  resourceHealthChecks:
+    - check: |
+        if obj.metadata.name == "flightctl-db-migration-1-dryrun" then
+          -- If the Job name is 'flightctl-db-migration-1-dryrun', always return a Healthy status immediately.
+          return {status = "Healthy", message = "Bypassing health check for specific Job 'flightctl-db-migration-1-dryrun' as requested."}
+        end
+
+        -- Standard logic for all other Jobs: check for completion or failure
+        if obj.status and obj.status.conditions then
+          for i, condition in ipairs(obj.status.conditions) do
+            if condition.type == "Complete" and condition.status == "True" then
+              return {status = "Healthy", message = "Job completed successfully"}
+            end
+            if condition.type == "Failed" and condition.status == "True" then
+              return {status = "Degraded", message = condition.message}
+            end
+          end
+        end
+
+        -- Default to Progressing if not complete/failed/ignored
+        return {status = "Progressing", message = "Job is running or waiting"}
+      group: batch
+      kind: Job

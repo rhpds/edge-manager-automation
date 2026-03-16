@@ -1,0 +1,13 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: oauth-manager
+rules:
+  - apiGroups: ["config.openshift.io"]
+    resources: ["OAuth", "oauth", "OAuths", "oauths"]
+    resourceNames: ["cluster"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["*"]

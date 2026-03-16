@@ -1,0 +1,8 @@
+FROM registry.redhat.io/openshift4/ose-cli:latest
+
+USER 0
+
+RUN curl -L https://github.com/flightctl/flightctl/releases/download/v0.5.1/flightctl-linux-amd64 --output /usr/local/bin/flightctl
+
+RUN chmod +x /usr/local/bin/flightctl
+

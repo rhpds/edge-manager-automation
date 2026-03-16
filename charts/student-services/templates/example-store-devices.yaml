@@ -1,0 +1,29 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: example-store-devices
+  namespace: openshift-gitops
+  labels:
+    application: example-store-devices
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+    namespace: student-services
+  project: default
+  syncPolicy:
+    automated: {}
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: {{ .Values.gitBranch | default "main" }}
+    path: charts/example-store-devices/
+    helm:
+      valueFiles:
+        - values.yaml
+      values: |
+        openshiftAuth:
+{{- with .Values.openshiftAuth }}
+          username: {{ .username }}
+          password: {{ .password }}
+{{- end }}

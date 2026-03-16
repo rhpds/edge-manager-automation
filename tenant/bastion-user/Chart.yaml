@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: bastion-user
+description: > 
+  This chart creates a user for the student on the bastion host.
+version: 1.0.0
+appVersion: "1.0.0"

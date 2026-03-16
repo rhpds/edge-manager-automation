@@ -1,0 +1,5 @@
+---
+
+gitSource:
+  url: git@your-git-repo.here
+  ref: main

@@ -1,0 +1,30 @@
+{{- range .Values.students }}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: pos
+  namespace: {{ . }}
+spec:
+  to:
+    kind: Service
+    name: point-of-sale-service
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: new-pos
+  namespace: {{ . }}
+spec:
+  to:
+    kind: Service
+    name: new-point-of-sale-service
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+{{- end }}

@@ -1,0 +1,440 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: build-bootc-image
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  params:
+    - name: imageName
+      type: string
+      default: 'rhde'
+    - name: imageVersion
+      type: string
+      default: '1.0.0'
+    - name: containerfilesDirectory
+      type: string
+      default: 'files/rhde'
+    - name: gitRepo
+      type: string
+      default: "your-git-repo-here"
+    - name: gitRef
+      type: string
+      default: main
+    - name: containerfilePath
+      type: string
+      default: path/to/Containerfile
+    - name: dataVolumeStorageClass
+      type: string
+      default: ocs-storagecluster-ceph-rbd-virtualization
+    - name: dataVolumeSize
+      type: string
+      default: 30Gi
+    - name: bootcImageBuilderConfigMap
+      description: ConfigMap containing config.toml for bootc image builder
+      type: string
+      default: bootc-image-builder-config
+  tasks:
+    - name: create-image-stream
+      displayName: Create Image Stream
+      description: Create an Image Stream to house image
+      params:
+        - name: action
+          value: apply
+        - name: manifest
+          value: |
+            kind: ImageStream
+            apiVersion: image.openshift.io/v1
+            metadata:
+              name: $(params.imageName)
+      taskRef:
+        kind: Task
+        name: manage-k8s-object
+    - name: create-build-config
+      displayName: Create Build Config
+      description: Create build config
+      params:
+        - name: action
+          value: apply
+        - name: manifest
+          value: |
+            kind: BuildConfig
+            apiVersion: build.openshift.io/v1
+            metadata:
+              name: $(params.imageName)
+            spec:
+              output:
+                to:
+                  kind: ImageStreamTag
+                  name: '$(params.imageName):$(params.imageVersion)'
+              strategy:
+                type: Docker
+                dockerStrategy:
+                  dockerfilePath: $(params.containerfilePath)
+                  volumes:
+                  - name: etc-pki-entitlement
+                    mounts:
+                    - destinationPath: /etc/pki/entitlement
+                    source:
+                      type: Secret
+                      secret:
+                        secretName: etc-pki-entitlement
+              source:
+                type: Git
+                git:
+                  uri: '$(params.gitRepo)'
+                  ref: $(params.gitRef)
+                contextDir: $(params.containerfilesDirectory)
+                configMaps:
+                  - configMap:
+                      name: flightctl-agent-config
+                    destinationDir: .flightctl-agent-config
+                  - configMap:
+                      name: registry-auth
+                    destinationDir: .registry-auth
+                secrets:
+                  - secret:
+                      name: pull-secret
+                    destinationDir: .pull-secret
+      taskRef:
+        kind: Task
+        name: manage-k8s-object
+    - name: build-image
+      displayName: Build Image
+      description: Build the specified image
+      params:
+        - name: buildconfig-name
+          value: $(params.imageName)
+      taskRef:
+        kind: Task
+        name: build-image
+      runAfter:
+        - create-build-config
+        - create-image-stream
+    - name: create-bib-output-pvc
+      displayName: Create Bootc Image Builder Output PVC
+      description: Allocate a PVC to use for the output of bootc image builder
+      params:
+        - name: action
+          value: apply
+        - name: manifest
+          value: |
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              name: $(params.imageName)-$(params.imageVersion)-bib-output-pvc
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: $(params.dataVolumeSize)
+              storageClassName: $(params.dataVolumeStorageClass)
+      taskRef:
+        kind: Task
+        name: manage-k8s-object
+      runAfter:
+        - build-image
+    - name: create-bib-containerstorage-pvc
+      displayName: Create Bootc Image Builder containerstorage pvc
+      description: Allocate a PVC to use for containerstorage
+      params:
+        - name: action
+          value: apply
+        - name: manifest
+          value: |
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              name: $(params.imageName)-$(params.imageVersion)-containerstorage-pvc
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: $(params.dataVolumeSize)
+              storageClassName: $(params.dataVolumeStorageClass)
+      taskRef:
+        kind: Task
+        name: manage-k8s-object
+      runAfter:
+        - build-image
+    - name: create-qcow2-with-bib
+      displayName: Create qcow2 from Bootc Image
+      description: Use bootc-image-builder to create a qcow2 image
+      params:
+        - name: action
+          value: apply
+        - name: manifest
+          value: |
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: $(params.imageName)-$(params.imageVersion)-bib-qcow2
+            spec:
+              template:
+                spec:
+                  restartPolicy: Never
+                  serviceAccountName: bib-sa
+                  initContainers:
+                    - name: prep-for-bib
+                      image: quay.io/rhpds/container-tools:1.0.0
+                      securityContext:
+                        privileged: true
+                      volumeMounts:
+                        - name: varlibcontainerstorage
+                          mountPath: /var/lib/containers/storage
+                        - name: tmp
+                          mountPath: /tmp
+                      command:
+                        - /bin/bash
+                        - -c
+                        - |
+                          oc registry login --registry image-registry.openshift-image-registry.svc:5000 --to=/var/lib/containers/storage/registry.json
+                          mkdir -p /var/lib/containers/storage/overlay
+                  containers:
+                    - name: run-bib
+                      image: registry.redhat.io/rhel9/bootc-image-builder@sha256:64f065e22fe1778b36126531f8f88c0f2a5e62626a72844931abcadc3d632c1f
+                      securityContext:
+                        privileged: true
+                      volumeMounts:
+                        - name: config-volume
+                          mountPath: /config.toml
+                          subPath: config.toml
+                        - name: output-volume
+                          mountPath: /output
+                        - name: store
+                          mountPath: /store
+                        - name: rpmmd
+                          mountPath: /rpmmd
+                        - name: varlibcontainerstorage
+                          mountPath: /var/lib/containers/storage
+                      command:
+                        - /bin/bash
+                        - -c
+                        - |
+                          podman pull image-registry.openshift-image-registry.svc:5000/{{ .Release.Namespace }}/$(params.imageName):$(params.imageVersion) --authfile=/var/lib/containers/storage/registry.json --tls-verify=false
+                          bootc-image-builder --type qcow2 --config /config.toml --local image-registry.openshift-image-registry.svc:5000/{{ .Release.Namespace }}/$(params.imageName):$(params.imageVersion)
+                  volumes:
+                    - name: config-volume
+                      configMap:
+                        name: $(params.bootcImageBuilderConfigMap)
+                    - name: output-volume
+                      persistentVolumeClaim:
+                        claimName: $(params.imageName)-$(params.imageVersion)-bib-output-pvc
+                    - name: store
+                      emptyDir:
+                        sizeLimit: 10Gi
+                    - name: rpmmd
+                      emptyDir:
+                        sizeLimit: 10Gi
+                    - name: varlibcontainerstorage
+                      persistentVolumeClaim:
+                        claimName: $(params.imageName)-$(params.imageVersion)-containerstorage-pvc
+                    - name: tmp
+                      emptyDir:
+                        sizeLimit: 1Gi
+      taskRef:
+        kind: Task
+        name: manage-k8s-object
+      runAfter:
+        - create-bib-output-pvc
+        - create-bib-containerstorage-pvc
+    - name: wait-for-bib
+      displayName: Wait for Bootc Image Builder
+      description: Wait for bootc to build the qcow2
+      params:
+        - name: job-name
+          value: $(params.imageName)-$(params.imageVersion)-bib-qcow2
+        - name: job-timeout
+          value: '3600'
+      taskRef:
+        kind: Task
+        name: wait-for-job
+      runAfter:
+        - create-qcow2-with-bib
+    - name: create-qcow2-webserver
+      displayName: Create Qcow2 Webserver
+      description: Host created qcow2 on a webserver
+      params:
+        - name: action
+          value: apply
+        - name: manifest
+          value: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: host-$(params.imageName)-$(params.imageVersion)-qcow2
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app: host-$(params.imageName)-$(params.imageVersion)-qcow2
+              template:
+                metadata:
+                  labels:
+                    app: host-$(params.imageName)-$(params.imageVersion)-qcow2
+                spec:
+                  containers:
+                  - name: webserver
+                    image: ubi9/httpd-24
+                    ports:
+                    - containerPort: 8080
+                    volumeMounts:
+                      - name: qcow2-volume
+                        mountPath: /var/www/html/
+                  volumes:
+                    - name: qcow2-volume
+                      persistentVolumeClaim:
+                        claimName: $(params.imageName)-$(params.imageVersion)-bib-output-pvc
+      taskRef:
+        kind: Task
+        name: manage-k8s-object
+      runAfter:
+        - wait-for-bib
+    - name: create-qcow2-webserver-service
+      displayName: Create Service for Qcow2 Webserver
+      description: Make qcow2 webserver accessable
+      params:
+        - name: action
+          value: apply
+        - name: manifest
+          value: |
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: host-$(params.imageName)-qcow2
+            spec:
+              selector:
+                app: host-$(params.imageName)-$(params.imageVersion)-qcow2
+              ports:
+                - protocol: TCP
+                  port: 8080
+                  targetPort: 8080
+      taskRef:
+        kind: Task
+        name: manage-k8s-object
+      runAfter:
+        - wait-for-bib
+    - name: import-qcow2
+      displayName: Import qcow2 to datavolume
+      description: Download via the service
+      params:
+        - name: action
+          value: apply
+        - name: manifest
+          value: |
+            apiVersion: cdi.kubevirt.io/v1beta1
+            kind: DataVolume
+            metadata:
+              name: $(params.imageName)-$(params.imageVersion)
+              annotations:
+                "cdi.kubevirt.io/storage.bind.immediate.requested": "true"
+            spec:
+              pvc:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: $(params.dataVolumeSize)
+                volumeMode: Block
+                storageClassName: $(params.dataVolumeStorageClass)
+              source:
+                http:
+                  url: http://host-$(params.imageName)-qcow2.{{ .Release.Namespace }}.svc:8080/qcow2/disk.qcow2
+      taskRef:
+        kind: Task
+        name: manage-k8s-object
+      runAfter:
+        - create-qcow2-webserver
+        - create-qcow2-webserver-service
+    - name: wait-for-datavolume-import
+      displayName: Wait for Qcow2 to be imported
+      description: Wait for Qcow2 to be imported
+      params:
+        - name: datavolume-name
+          value: $(params.imageName)-$(params.imageVersion)
+        - name: datavolume-timeout
+          value: '3600'
+      taskRef:
+        kind: Task
+        name: wait-for-datavolume
+      runAfter:
+        - import-qcow2
+  finally:
+    - name: cleanup-bib-output-pvc
+      displayName: Cleanup BIB Output PVC
+      description: Delete the BIB output PVC
+      params:
+        - name: action
+          value: delete
+        - name: manifest
+          value: |
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              name: $(params.imageName)-$(params.imageVersion)-bib-output-pvc
+      taskRef:
+        kind: Task
+        name: manage-k8s-object
+    - name: cleanup-bib-containerstorage-pvc
+      displayName: Cleanup BIB Container Storage PVC
+      description: Delete the PVC used for temp containerstorage
+      params:
+        - name: action
+          value: delete
+        - name: manifest
+          value: |
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              name: $(params.imageName)-$(params.imageVersion)-containerstorage-pvc
+      taskRef:
+        kind: Task
+        name: manage-k8s-object
+    - name: cleanup-qcow-webserver
+      displayName: Cleanup Qcow2 Webserver
+      description: Delete the webserver hosting the qcow2
+      params:
+        - name: action
+          value: delete
+        - name: manifest
+          value: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: host-$(params.imageName)-$(params.imageVersion)-qcow2
+      taskRef:
+        kind: Task
+        name: manage-k8s-object
+    - name: cleanup-qcow-webserver-service
+      displayName: Cleanup Qcow2 Webserver Service
+      description: Delete the service pointing to the webserver hosting the qcow2
+      params:
+        - name: action
+          value: delete
+        - name: manifest
+          value: |
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: host-$(params.imageName)-qcow2
+      taskRef:
+        kind: Task
+        name: manage-k8s-object
+    - name: cleanup-bib-job
+      displayName: Cleanup BIB Job
+      description: Delete the job that ran bootc image builder
+      params:
+        - name: action
+          value: delete
+        - name: manifest
+          value: |
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: $(params.imageName)-$(params.imageVersion)-bib-qcow2
+      taskRef:
+        kind: Task
+        name: manage-k8s-object

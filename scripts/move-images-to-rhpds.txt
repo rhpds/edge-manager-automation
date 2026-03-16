@@ -1,0 +1,23 @@
+quay.io/jswanson/container-tools:1.0.0
+quay.io/jswanson/container-tools:2.0.0
+quay.io/jswanson/flightctl-web-terminal-tooling:1.0.0
+quay.io/jswanson/pos-v1-prod:1.0.0
+quay.io/jswanson/rhel-bootc-flightctl-agent:9.5
+
+podman pull quay.io/jswanson/container-tools:1.0.0
+podman pull quay.io/jswanson/container-tools:2.0.0
+podman pull quay.io/jswanson/flightctl-web-terminal-tooling:1.0.0
+podman pull quay.io/jswanson/pos-v1-prod:1.0.0
+podman pull quay.io/jswanson/rhel-bootc-flightctl-agent:9.5
+
+podman tag quay.io/jswanson/container-tools:1.0.0 quay.io/rhpds/container-tools:1.0.0;
+podman tag quay.io/jswanson/container-tools:2.0.0 quay.io/rhpds/container-tools:2.0.0;
+podman tag quay.io/jswanson/flightctl-web-terminal-tooling:1.0.0 quay.io/rhpds/flightctl-web-terminal-tooling:1.0.0;
+podman tag quay.io/jswanson/pos-v1-prod:1.0.0 quay.io/rhpds/pos-v1-prod:1.0.0;
+podman tag quay.io/jswanson/rhel-bootc-flightctl-agent:9.5 quay.io/rhpds/rhel-bootc-flightctl-agent:9.5;
+
+podman push  quay.io/rhpds/container-tools:1.0.0
+podman push  quay.io/rhpds/container-tools:2.0.0
+podman push  quay.io/rhpds/flightctl-web-terminal-tooling:1.0.0
+podman push  quay.io/rhpds/pos-v1-prod:1.0.0
+podman push  quay.io/rhpds/rhel-bootc-flightctl-agent:9.5

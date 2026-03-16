@@ -1,0 +1,26 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: infra-bootstrap
+  namespace: openshift-gitops
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    application: infra-bootstrap
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+  project: default
+  syncPolicy:
+    automated: {}
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: rh1-2026
+    path: infra/bootstrap/
+    helm:
+      values: |
+        gitBranch: rh1-2026
+        openshiftClusterIngressDomain: "{{ .Values.deployer.domain }}"
+        bastionSshPassword: "{{ .Values.bastion_ssh_password }}"

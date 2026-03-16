@@ -1,0 +1,109 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: approve-example-devices
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      backoffLimit: 5
+      serviceAccountName: route-reader
+      containers:
+        - name: approve-devices
+          image: image-registry.openshift-image-registry.svc:5000/student-services/flightctl-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              FLIGHTCTL_USERNAME=$(cat /tmp/openshift-auth/username)
+              FLIGHTCTL_PASSWORD=$(cat /tmp/openshift-auth/password)
+              until FLIGHTCTL_API_URL=$(oc get route flightctl-api-route -n open-cluster-management -o go-template='{{ "{{" }}.spec.host{{ "}}" }}') && [ -n "$FLIGHTCTL_API_URL" ]; do
+                echo "Route not found, retrying in 5 seconds..."
+                sleep 5
+              done
+
+              until flightctl login "https://$FLIGHTCTL_API_URL" --username "$FLIGHTCTL_USERNAME" --password "$FLIGHTCTL_PASSWORD" --insecure-skip-tls-verify; do
+                echo "Login failed, retrying in 5 seconds..."
+                sleep 5
+              done
+
+              # Device name array
+              ALIASES=(
+{{- range .Values.storeDevices }}
+                "{{ .name }}"
+{{- end }}
+              )
+
+              TOTAL_DEVICES=${#ALIASES[@]}
+
+              # Track which aliases have been assigned
+              declare -A APPROVED_ALIASES
+
+              while true; do
+                echo "Checking for pending enrollment requests..."
+
+                # Reset the list each loop
+                PENDING_DEVICE_IDS=()
+
+                # Fetch current pending devices
+                while IFS= read -r line; do
+                  STATUS=$(echo "$line" | awk '{print $2}')
+                  if [[ "$STATUS" == "Pending" ]]; then
+                    DEVICE_ID=$(echo "$line" | awk '{print $1}')
+                    PENDING_DEVICE_IDS+=("$DEVICE_ID")
+                  fi
+                done < <(flightctl get enrollmentrequests 2>/dev/null | tail -n +2)
+
+                if [ "${#PENDING_DEVICE_IDS[@]}" -eq 0 ]; then
+                  echo "No pending devices found."
+                else
+                  for DEVICE_ID in "${PENDING_DEVICE_IDS[@]}"; do
+                    for ALIAS in "${ALIASES[@]}"; do
+                      if [[ -z "${APPROVED_ALIASES[$ALIAS]+x}" ]]; then
+                        echo "Approving device '$DEVICE_ID' with alias '$ALIAS'..."
+                        if flightctl approve -l "alias=${ALIAS}" -l "pos=prod" "enrollmentrequest/${DEVICE_ID}"; then
+                          APPROVED_ALIASES["$ALIAS"]=true
+                        else
+                          echo "Failed to approve device $DEVICE_ID with alias $ALIAS"
+                        fi
+                        break
+                      fi
+                    done
+                  done
+                fi
+
+                echo "Approved devices count: ${#APPROVED_ALIASES[@]}/$TOTAL_DEVICES"
+
+                if [ "${#APPROVED_ALIASES[@]}" -ge "$TOTAL_DEVICES" ]; then
+                  echo "All devices have been approved."
+                  break
+                fi
+
+                echo "Waiting before checking again..."
+                sleep 10
+              done
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: dot-config
+              mountPath: /.config
+            - name: openshift-auth
+              readOnly: true
+              mountPath: /tmp/openshift-auth
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 100Mi
+        - name: dot-config
+          emptyDir:
+            sizeLimit: 100Mi
+        - name: openshift-auth
+          secret:
+            secretName: openshift-auth
+
+
+
+

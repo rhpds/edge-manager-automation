@@ -1,0 +1,8 @@
+---
+apiVersion: v2
+name: enable-rhsm-in-builds-rbac
+description: >
+  Creates required resources to copy rhsm secrets into student namespaces
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

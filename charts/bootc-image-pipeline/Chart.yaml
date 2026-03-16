@@ -1,0 +1,6 @@
+apiVersion: v2
+name: bootc-image-pipeline
+description: Builds bootc images and creates the required resources to run them with OCP-virt
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

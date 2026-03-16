@@ -1,0 +1,23 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: update-web-terminal
+  namespace: openshift-gitops
+  labels:
+    application: update-web-terminal
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+    namespace: openshift-operators
+  project: default
+  syncPolicy:
+    automated: {}
+  source:
+    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    targetRevision: {{ .Values.gitBranch | default "main" }}
+    path: charts/update-web-terminal/
+    helm:
+      valueFiles:
+        - values.yaml

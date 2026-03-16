@@ -1,0 +1,3 @@
+---
+advancedClusterManagement:
+  storageClassName: ocs-external-storagecluster-ceph-rbd

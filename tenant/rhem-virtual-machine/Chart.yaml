@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: rhem-virtual-machine
+description: > 
+  This chart creates a virtual machine for students to run RHEM, and create the resources that allow connectivity to RHEM on the virtual machine
+version: 1.0.0
+appVersion: "1.0.0"

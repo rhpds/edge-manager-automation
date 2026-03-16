@@ -1,0 +1,56 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: configure-student-vm
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded, HookFailed
+  labels:
+    app.kubernetes.io/name: configure-student-vm
+    app.kubernetes.io/part-of: rhem-virtual-machine
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: configure-student-vm
+        app.kubernetes.io/part-of: rhem-virtual-machine
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: secret-reader
+      containers:
+        - name: run-ansible-playbook
+          image: quay.io/jswanson/general-ansible-ee:rh1-2026
+          imagePullPolicy: Always
+          command: ["ansible-playbook", "/runner/playbook.yaml", "--inventory", "/runner/inventory.yaml", "-vv"]
+          volumeMounts:
+            - name: inventory
+              mountPath: /runner/inventory.yaml
+              subPath:  inventory.yaml
+            - name: playbook
+              mountPath: /runner/playbook.yaml
+              subPath: playbook.yaml
+            - name: script
+              mountPath: /runner/import-disk-image.sh
+              subPath: import-disk-image.sh
+            - name: template
+              mountPath: /runner/override.facts.j2
+              subPath: override.facts.j2
+            - name: scratch
+              mountPath: /.ansible
+      volumes:
+        - name: inventory
+          configMap:
+            name: rhem-vm-ansible-job-inputs
+        - name: playbook
+          configMap:
+            name: rhem-vm-ansible-job-inputs
+        - name: script
+          configMap:
+            name: rhem-vm-ansible-job-inputs
+        - name: template
+          configMap:
+            name: rhem-vm-ansible-job-inputs
+        - name: scratch
+          emptyDir: {}

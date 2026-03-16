@@ -1,0 +1,28 @@
+{{- range .Values.storeDevices }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}-pos-service
+spec:
+  selector:
+    kubevirt.io/domain: {{ .name }}
+  ports:
+    - protocol: TCP
+      port: 30000
+      targetPort: 30000
+      name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}-new-pos-service
+spec:
+  selector:
+    kubevirt.io/domain: {{ .name }}
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+      name: http
+{{- end }}

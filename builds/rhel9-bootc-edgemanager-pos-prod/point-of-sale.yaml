@@ -1,0 +1,11 @@
+---
+apiVerson: v1
+kind: Pod
+metadata:
+  name: point-of-sale
+spec:
+  containers:
+  - name: pos-prod
+    image: quay.io/rhpds/pos-v1-prod:1.0.0
+    ports:
+      - containerPort: 8080

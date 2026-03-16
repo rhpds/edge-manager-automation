@@ -1,0 +1,22 @@
+{{- range .Values.storeDevices }}
+---
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: {{ .name }}-bootdisk
+  annotations:
+    "cdi.kubevirt.io/storage.bind.immediate.requested": "true"
+spec:
+  pvc:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: {{ $.Values.virtualMachines.storageSize }}
+    volumeMode: Block
+    storageClassName: {{ $.Values.virtualMachines.storageClass }}
+  source:
+    pvc:
+      name: rhel9-bootc-edgemanager-pos-prod-1.0.0
+      namespace: {{ $.Values.virtualMachines.sourcePvcNamespace }}
+{{- end }}

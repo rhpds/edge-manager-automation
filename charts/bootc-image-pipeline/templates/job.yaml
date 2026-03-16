@@ -1,0 +1,33 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: wait-for-configmap-job
+spec:
+  template:
+    spec:
+      serviceAccountName: configmap-watcher-sa
+      restartPolicy: Never
+      containers:
+        - name: wait-for-flightctl-agent-configmap
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for ConfigMap 'flightctl-agent-config' to exist..."
+              until kubectl get configmap flightctl-agent-config; do
+                sleep 5
+              done
+              echo "ConfigMap 'flightctl-agent-config' found! Exiting..."
+        - name: wait-for-registry-auth-configmap
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for ConfigMap 'registry-auth' to exist..."
+              until kubectl get configmap registry-auth; do
+                sleep 5
+              done
+              echo "ConfigMap 'registry-auth' found! Exiting..."
