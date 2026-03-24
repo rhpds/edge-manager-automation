@@ -32,7 +32,7 @@ spec:
     helm:
       parameters:
         - name: global.baseDomain
-          value: fctl.{{ .Values.openshiftClusterIngressDomain }}
+          value: fctl.wksp-{{ .Values.guid }}-{{ .Values.tenant }}.{{ .Values.openshiftClusterIngressDomain }}
         - forceString: true
           name: global.enableOpenShiftExtensions
           value: 'true'
