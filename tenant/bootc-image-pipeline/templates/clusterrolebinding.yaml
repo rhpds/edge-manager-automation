@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: bib-sa-privileged-binding
+  name: {{ .Values.guid }}-{{ .Values.tenant }}-bib-sa-privileged-binding
 subjects:
   - kind: ServiceAccount
     name: bib-sa
