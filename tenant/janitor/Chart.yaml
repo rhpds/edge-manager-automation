@@ -1,7 +1,0 @@
-apiVersion: v2
-name: janitor
-description: >
-  Cleans up non-k8s resources via job. Includes a "placeholder" resource that, once deleted, triggers the cleanup.
-type: application
-version: 1.0.0
-appVersion: "1.0.0"

@@ -1,7 +1,0 @@
----
-apiVersion: v2
-name: users
-description: > 
-  Configures user auth for the tenants.
-version: 1.0.0
-appVersion: "1.0.0"

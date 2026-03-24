@@ -1,7 +1,0 @@
----
-apiVersion: v2
-name: load-test
-description: > 
-  Deploys resources to be used for load testing of the lab - or optionally, to "auto-complete" the exercises.
-version: 1.0.0
-appVersion: "1.0.0"
