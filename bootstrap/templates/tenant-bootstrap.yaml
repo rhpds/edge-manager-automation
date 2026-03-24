@@ -16,7 +16,7 @@ spec:
   syncPolicy:
     automated: {}
   source:
-    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    repoURL: https://github.com/rhpds/edge-manager-automation.git
     targetRevision: main
     path: tenant/bootstrap/
     helm:
