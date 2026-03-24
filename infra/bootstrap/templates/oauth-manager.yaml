@@ -17,7 +17,7 @@ spec:
     automated:
       prune: true
   source:
-    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
+    repoURL: https://github.com/rhpds/edge-manager-automation.git
     targetRevision: {{ .Values.gitBranch | default "main" }}
     path: infra/oauth-manager/
     helm:
