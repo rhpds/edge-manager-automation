@@ -1,0 +1,29 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.guid }}-{{ .Values.tenant }}-bootc-image-pipeline
+  namespace: openshift-gitops
+  labels:
+    application: {{ .Values.guid }}-{{ .Values.tenant }}-bootc-image-pipeline
+    guid.rhdp.io: {{ .Values.guid }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+    namespace: wksp-{{ .Values.guid }}-{{ .Values.tenant }}
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+  source:
+    repoURL: https://github.com/rhpds/edge-manager-automation.git
+    targetRevision: main
+    path: tenant/bootc-image-pipeline/
+    helm:
+      values: |
+        gitBranch: main
+        tenant: {{ .Values.tenant }}
+        guid: "{{ .Values.guid }}"
