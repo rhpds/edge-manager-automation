@@ -21,12 +21,12 @@ spec:
     syncOptions:
       - CreateNamespace=true
   source:
-    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
-    targetRevision: rh1-2026
+    repoURL: https://github.com/rhpds/edge-manager-automation.git
+    targetRevision: main
     path: tenant/users/
     helm:
       values: |
-        gitBranch: rh1-2026
+        gitBranch: main
         user:
           {{- with .Values.user }}
           prefix: "{{ .prefix }}"

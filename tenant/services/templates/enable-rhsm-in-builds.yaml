@@ -19,11 +19,11 @@ spec:
     automated:
       prune: true
   source:
-    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
-    targetRevision: rh1-2026
+    repoURL: https://github.com/rhpds/edge-manager-automation.git
+    targetRevision: main
     path: tenant/enable-rhsm-in-builds/
     helm:
       values: |
-        gitBranch: rh1-2026
+        gitBranch: main
         tenant: {{ .Values.tenant }}
         guid: "{{ .Values.guid }}"
