@@ -16,11 +16,11 @@ spec:
   syncPolicy:
     automated: {}
   source:
-    repoURL: https://github.com/rhpds/edge-fleet-gitops.git
-    targetRevision: rh1-2026
+    repoURL: https://github.com/rhpds/edge-manager-automation.git
+    targetRevision: main
     path: infra/bootstrap/
     helm:
       values: |
-        gitBranch: rh1-2026
-        openshiftClusterIngressDomain: "{{ .Values.deployer.domain }}"
+        gitBranch: main
         bastionSshPassword: "{{ .Values.bastion_ssh_password }}"
+        rhemVersion: 1.0.2

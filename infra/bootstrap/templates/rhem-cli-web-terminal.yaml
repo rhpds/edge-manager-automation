@@ -20,3 +20,5 @@ spec:
     targetRevision: {{ .Values.gitBranch | default "main" }}
     path: infra/rhem-cli-web-terminal/
     helm:
+      values: |
+        rhemVersion: "{{ .Values.rhemVersion }}"
