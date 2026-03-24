@@ -17,11 +17,11 @@ spec:
     automated: {}
   source:
     repoURL: https://github.com/rhpds/edge-fleet-gitops.git
-    targetRevision: rh1-2026
+    targetRevision: main
     path: tenant/bootstrap/
     helm:
       values: |
-        gitBranch: rh1-2026
+        gitBranch: main
         user:
           {{- with .Values.user }}
           prefix: "{{ .prefix }}"
@@ -35,3 +35,4 @@ spec:
         gitea_admin_username: "{{ .Values.gitea_admin_username }}"
         gitea_admin_password: "{{ .Values.gitea_admin_password }}"
         openshiftClusterIngressDomain: "{{ .Values.deployer.domain }}"
+        rhemVersion" {{ .Values.rhemVersion }}
