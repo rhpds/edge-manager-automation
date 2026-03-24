@@ -1,5 +1,5 @@
 apiVersion: v2
-name: pipelines
+name: openshift-pipelines
 description: A chart to install the pipeline service on a spoke or a hub
 type: application
 version: 1.0.0
