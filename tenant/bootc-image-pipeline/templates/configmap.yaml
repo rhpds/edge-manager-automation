@@ -6,8 +6,8 @@ metadata:
 data:
   config.toml: |
     [[customizations.user]]
-    name = "{{ .Values.bootcImageBuilderConfig.username }}"
-    password = "{{ .Values.bootcImageBuilderConfig.password }}"
+    name = "student"
+    password = "{{ .Values.bastionSshPassword }}"
     groups = ["wheel"]
     [customizations.kernel]
     name = "disable-selinux"
