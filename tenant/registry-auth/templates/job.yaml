@@ -1,0 +1,36 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: populate-registry-auth-configmap
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      serviceAccountName: registry-auth-sa
+      containers:
+        - name: populate-registry-auth-configmap
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              # Log in and write the auth config
+              oc registry login --to=/tmp/auth.json
+
+              # View contents
+              cat /tmp/auth.json
+
+              # Check if the ConfigMap exists
+              if oc get configmap registry-auth >/dev/null 2>&1; then
+                echo "ConfigMap 'registry-auth' already exists. Updating it..."
+              else
+                echo "ConfigMap 'registry-auth' does not exist. Creating it..."
+              fi
+
+              # Create or update the ConfigMap with the latest auth.json
+              oc create configmap registry-auth \
+                --from-file=/tmp/auth.json \
+                --dry-run=client -o yaml | oc apply -f -
+      restartPolicy: OnFailure
+

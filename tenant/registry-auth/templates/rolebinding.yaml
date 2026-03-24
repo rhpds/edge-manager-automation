@@ -1,0 +1,13 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: registry-auth-rolebinding
+subjects:
+- kind: ServiceAccount
+  name: registry-auth-sa
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: registry-auth-role
+  apiGroup: rbac.authorization.k8s.io
