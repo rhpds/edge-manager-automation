@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: gitea
+description: > 
+  This chart deploys an instance of gitea using the gitea operator.
+version: 1.0.0
+appVersion: "1.0.0"

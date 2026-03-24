@@ -1,0 +1,10 @@
+---
+apiVersion: pfe.rhpds.com/v1
+kind: Gitea
+metadata:
+  name: gitea
+spec:
+  giteaSsl: true
+  giteaAdminUser: {{ .Values.guid }}-{{ .Values.tenant }}
+  giteaAdminEmail: 'dont@email.me'
+  giteaAdminPassword: "{{ .Values.giteaAdminPassword }}"
