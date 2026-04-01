@@ -1,0 +1,20 @@
+---
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: edge-device-bootdisk
+  annotations:
+    "cdi.kubevirt.io/storage.bind.immediate.requested": "true"
+spec:
+  pvc:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: {{ .Values.edgeDevice.storageSize }}
+    volumeMode: Block
+    storageClassName: {{ .Values.edgeDevice.storageClass }}
+  source:
+    pvc:
+      name: {{ $.Values.edgeDevice.sourcePvcName }}
+      namespace: {{ $.Values.edgeDevice.sourcePvcNamespace }}

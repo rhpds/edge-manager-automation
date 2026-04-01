@@ -1,0 +1,6 @@
+apiVersion: v2
+name: edge-device
+description: Rolls out virtualized edge devices for students
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
