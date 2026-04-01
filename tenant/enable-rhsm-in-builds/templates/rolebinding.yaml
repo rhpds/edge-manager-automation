@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: bind-secret-writer
+  name: {{ .Values.guid }}-{{ .Values.tenant }}-bind-secret-writer
 subjects:
 - kind: ServiceAccount
   name: secret-copier
@@ -15,7 +15,7 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: bind-secret-reader-{{ .Values.guid }}-{{ .Values.tenant }}
+  name: {{ .Values.guid }}-{{ .Values.tenant }}-bind-secret-reader
   namespace: openshift-config-managed
 subjects:
 - kind: ServiceAccount
