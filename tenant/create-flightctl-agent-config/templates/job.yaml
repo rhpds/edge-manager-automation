@@ -1,0 +1,72 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-rhem-agent-config
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: rhem-agent-config-creater
+      containers:
+        - name: create-rhem-agent-config
+          image: image-registry.openshift-image-registry.svc:5000/openshift-operators/rhem-cli-web-terminal
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cd /tmp
+              RHEM_USERNAME=$(cat /tmp/rhem-auth/username)
+              RHEM_PASSWORD=$(cat /tmp/rhem-auth/password)
+
+              # Wait for route to become available
+              until RHEM_API_URL=$(oc get route flightctl-api-route -o go-template='{{ "{{" }}.spec.host{{ "}}" }}') && [ -n "$RHEM_API_URL" ]; do
+                echo "Route not found, retrying in 5 seconds..."
+                sleep 5
+              done
+
+              # Wait until login works
+              until flightctl login "https://$RHEM_API_URL" --username "$FLIGHTCTL_USERNAME" --password "$FLIGHTCTL_PASSWORD" --insecure-skip-tls-verify; do
+                echo "Login failed, retrying in 5 seconds..."
+                sleep 5
+              done
+
+              # Attempt to get certificate, and retry if unsuccessful
+              until flightctl certificate request --signer=enrollment --expiration=365d --output=embedded > config.yaml; do
+                echo "Certificate request failed, retrying in 5 seconds..."
+                sleep 5
+              done
+
+              # Add enrollment request and configs into a configMap that builds will use later
+              echo '---
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: rhem-agent-config
+              data:
+                config.yaml: |
+                  spec-fetch-interval: 0m10s
+                  status-update-interval: 0m10s' > /tmp/configmap.yaml
+              cat config.yaml | sed 's/^/    /g' >> /tmp/configmap.yaml
+              oc apply -f configmap.yaml
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: dot-config
+              mountPath: /.config
+            - name: rhem-auth
+              readOnly: true
+              mountPath: /tmp/rhem-auth
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 100Mi
+        - name: dot-config
+          emptyDir:
+            sizeLimit: 100Mi
+        - name: rhem-auth
+          secret:
+            secretName: rhem-auth
