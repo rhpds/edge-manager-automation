@@ -2,8 +2,8 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ .Values.guid }}-{{ .Values.tenant }}-secret-writer
+  name: rhsm-secret-writer
 rules:
 - apiGroups: [""]
   resources: ["secrets"]
-  verbs: ["create", "get", "update", "list", "apply"]
+  verbs: ["create", "get", "update", "list", "apply", "patch"]
