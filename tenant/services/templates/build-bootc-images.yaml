@@ -2,10 +2,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ .Values.guid }}-{{ .Values.tenant }}-bootc-image-pipeline
+  name: {{ .Values.guid }}-{{ .Values.tenant }}-build-bootc-images
   namespace: openshift-gitops
   labels:
-    application: {{ .Values.guid }}-{{ .Values.tenant }}-bootc-image-pipeline
+    application: {{ .Values.guid }}-{{ .Values.tenant }}-build-bootc-images
     guid.rhdp.io: {{ .Values.guid }}
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -21,10 +21,9 @@ spec:
   source:
     repoURL: https://github.com/rhpds/edge-manager-automation.git
     targetRevision: main
-    path: tenant/bootc-image-pipeline/
+    path: tenant/build-bootc-images/
     helm:
       values: |
         gitBranch: main
         tenant: {{ .Values.tenant }}
         guid: "{{ .Values.guid }}"
-        userPassword: "{{ .Values.user_password }}"
