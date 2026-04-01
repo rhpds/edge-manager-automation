@@ -2,9 +2,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: allow-read-pull-secret
+  name: pull-secret-reader
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
     resourceNames: ["pull-secret"]
-    verbs: ["get"]
+    verbs: ["get", "list"]

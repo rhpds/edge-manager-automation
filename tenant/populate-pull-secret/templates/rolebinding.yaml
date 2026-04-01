@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ .Values.guid }}-{{ .Values.tenant }}-bind-pull-secret-writer
+  name: bind-pull-secret-writer
 subjects:
 - kind: ServiceAccount
   name: pull-secret-copier
