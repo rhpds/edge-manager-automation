@@ -1,4 +1,3 @@
-{{- range .Values.bootcImages }}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -37,25 +36,6 @@ spec:
               metadata:
                 generateName: build-bootc-image-
               spec:
-                params:
-                  - name: imageName
-                    value: {{ .name }}
-                  - name: imageVersion
-                    value: {{ .version }}
-                  - name: containerfilesDirectory
-                    value: {{ .containerfilesDirectory }}
-                  - name: gitRepo
-                    value: '{{ .gitRepo }}'
-                  - name: gitRef
-                    value: {{ .gitRef }}
-                  - name: containerfilePath
-                    value: {{ .containerfilePath }}
-                  - name: dataVolumeStorageClass
-                    value: {{ .dataVolumeStorageClass }}
-                  - name: dataVolumeSize
-                    value: {{ .dataVolumeSize }}
-                  - name: bootcImageBuilderConfigMap
-                    value: {{ .bootcImageBuilderConfigMap }}
                 pipelineRef:
                   name: build-bootc-image
                 taskRunTemplate:
@@ -64,4 +44,3 @@ spec:
                   pipeline: 1h0m0s
               EOF
               echo "PipelineRun created successfully!"
-{{- end }}
