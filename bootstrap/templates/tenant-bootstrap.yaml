@@ -27,6 +27,7 @@ spec:
           prefix: "{{ .prefix }}"
           count: "{{ .count }}"
           {{- end }}
+        user_password: "{{ .Values.user_password }}"
         guid: "{{ .Values.guid }}"
         bastion_ssh_password: "{{ .Values.bastion_ssh_password }}"
         satellite_activationkey: "{{ .Values.satellite_activationkey }}"
