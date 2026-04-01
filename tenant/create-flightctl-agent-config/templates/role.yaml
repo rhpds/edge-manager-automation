@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: rhem-agent-config-role
+  name: rhem-agent-config-creater-role
 rules:
   - apiGroups: ["route.openshift.io"]
     resources: ["*"]
