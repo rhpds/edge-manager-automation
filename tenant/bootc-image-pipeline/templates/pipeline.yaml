@@ -18,16 +18,16 @@ spec:
       default: 'files/rhde'
     - name: gitRepo
       type: string
-      default: "your-git-repo-here"
+      default: "https://github.com/rhpds/edge-manager-automation.git"
     - name: gitRef
       type: string
       default: main
     - name: containerfilePath
       type: string
-      default: path/to/Containerfile
+      default: builds/edge-device
     - name: dataVolumeStorageClass
       type: string
-      default: ocs-storagecluster-ceph-rbd-virtualization
+      default: ocs-storagecluster-ceph-rbd
     - name: dataVolumeSize
       type: string
       default: 30Gi

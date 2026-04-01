@@ -7,7 +7,7 @@ data:
   config.toml: |
     [[customizations.user]]
     name = "student"
-    password = "{{ .Values.bastionSshPassword }}"
+    password = "{{ .Values.user_password }}"
     groups = ["wheel"]
     [customizations.kernel]
     name = "disable-selinux"
