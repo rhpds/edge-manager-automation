@@ -1,0 +1,30 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.guid }}-{{ .Values.tenant }}-create-flightctl-agent-config
+  namespace: openshift-gitops
+  labels:
+    application: {{ .Values.guid }}-{{ .Values.tenant }}-create-flightctl-agent-config
+    guid.rhdp.io: {{ .Values.guid }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    name: ''
+    server: https://kubernetes.default.svc
+    namespace: wksp-{{ .Values.guid }}-{{ .Values.tenant }}
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+  source:
+    repoURL: https://github.com/rhpds/edge-manager-automation.git
+    targetRevision: main
+    path: tenant/create-flightctl-agent-config/
+    helm:
+      values: |
+        gitBranch: main
+        tenant: {{ .Values.tenant }}
+        guid: "{{ .Values.guid }}"
+        userPassword: "{{ .Values.user_password }}"
