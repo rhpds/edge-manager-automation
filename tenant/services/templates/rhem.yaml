@@ -15,7 +15,6 @@ spec:
     automated:
       prune: true
   destination:
-    name: ''
     namespace: wksp-{{ .Values.guid }}-{{ .Values.tenant }}
     server: 'https://kubernetes.default.svc'
   ignoreDifferences:
@@ -29,6 +28,8 @@ spec:
   project: default
   source:
     chart: flightctl
+    repoURL: quay.io/flightctl/charts
+    targetRevision: {{ .Values.rhemVersion }}
     helm:
       parameters:
         - name: global.baseDomain
@@ -47,5 +48,3 @@ spec:
           value: 'https://oauth-openshift.{{ .Values.openshiftClusterIngressDomain }}/oauth/authorize'
         - name: global.generateCertificates
           value: builtin
-    repoURL: quay.io/flightctl/charts
-    targetRevision: {{ .Values.rhemVersion }}
