@@ -39,7 +39,7 @@ spec:
             satelliteUrl: "{{ .Values.satellite_url }}"
             giteaAdminUsername: "{{ .Values.gitea_admin_username }}"
             giteaAdminPassword: "{{ .Values.gitea_admin_password }}"
-            openshiftClusterIngressDomain: "{{ .Values.openshiftClusterIngressDomain }}"
+            openshiftClusterIngressDomain: "{{ .Values.deployer.domain }}"
             rhemVersion: "{{ .Values.rhemVersion }}"
             userPassword: "{{ .Values.userPassword }}"
       destination:
