@@ -18,6 +18,11 @@ spec:
   syncPolicy:
     automated:
       prune: true
+  ignoreDifferences:
+    - group: batch
+      kind: Job
+      jsonPointers:
+        - /spec/template/spec/backoffLimit
   source:
     repoURL: https://github.com/rhpds/edge-manager-automation.git
     targetRevision: main
