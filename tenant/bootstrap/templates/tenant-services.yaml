@@ -41,7 +41,7 @@ spec:
             giteaAdminPassword: "{{ .Values.gitea_admin_password }}"
             openshiftClusterIngressDomain: "{{ .Values.deployer.domain }}"
             rhemVersion: "{{ .Values.rhemVersion }}"
-            userPassword: "{{ .Values.userPassword }}"
+            userPassword: "{{ .Values.user_password }}"
       destination:
         server: https://kubernetes.default.svc
       syncPolicy:
