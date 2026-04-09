@@ -21,4 +21,4 @@ spec:
     path: infra/rhem-cli-web-terminal/
     helm:
       values: |
-        rhemVersion: "{{ .Values.rhemVersion }}"
+        rhemVersion: '1.0.2'
