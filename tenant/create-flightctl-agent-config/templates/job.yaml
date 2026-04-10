@@ -29,7 +29,7 @@ spec:
               done
 
               # Wait until login works
-              until flightctl login "https://$RHEM_API_URL" --username "$FLIGHTCTL_USERNAME" --password "$FLIGHTCTL_PASSWORD" --insecure-skip-tls-verify; do
+              until flightctl login "https://$RHEM_API_URL" --username "$RHEM_USERNAME" --password "$RHEM_PASSWORD" --insecure-skip-tls-verify; do
                 echo "Login failed, retrying in 5 seconds..."
                 sleep 5
               done
