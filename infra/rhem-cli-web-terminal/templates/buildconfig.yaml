@@ -18,5 +18,5 @@ spec:
       ARG BASE_IMAGE
       FROM ${BASE_IMAGE}
       USER 0
-      RUN curl -L https://github.com/flightctl/flightctl/releases/download/{{ .Values.rhemVersion }}/flightctl-linux-amd64 --output /usr/local/bin/flightctl
+      RUN curl -L https://github.com/flightctl/flightctl/releases/download/v{{ .Values.rhemVersion }}/flightctl-linux-amd64 --output /usr/local/bin/flightctl
       RUN chmod +x /usr/local/bin/flightctl
