@@ -27,4 +27,4 @@ spec:
         gitBranch: main
         tenant: {{ .Values.tenant }}
         guid: "{{ .Values.guid }}"
-        userPassword: "{{ .Values.user_password }}"
+        userPassword: "{{ .Values.userPassword }}"
